@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westus3"
+    },
+    "containerAppName": {
+      "value": "movie-tracker-api"
+    },
+    "environmentName": {
+      "value": "movie-tracker-env"
+    },
+    "logAnalyticsName": {
+      "value": "movie-tracker-law"
+    },
+    "appInsightsName": {
+      "value": "movie-tracker-ai"
+    },
+    "environmentType": {
+      "value": "demo"
+    },
+    "acrName": {
+      "value": "movietracker"
+    },
+    "containerImage": {
+      "value": "mcr.microsoft.com/k8se/quickstart:latest"
+    },
+    "containerCpu": {
+      "value": "0.5"
+    },
+    "containerMemory": {
+      "value": "1Gi"
+    },
+    "targetPort": {
+      "value": 8080
+    },
+    "externalIngress": {
+      "value": true
+    },
+    "minReplicas": {
+      "value": 0
+    },
+    "maxReplicas": {
+      "value": 5
+    },
+    "azureOpenAIEndpoint": {
+      "value": ""
+    },
+    "azureOpenAIDeployment": {
+      "value": ""
+    },
+    "azureOpenAIKey": {
+      "value": ""
+    },
+    "keyVaultName": {
+      "value": "movie-tracker-kv"
+    },
+    "userPrincipalId": {
+      "value": "97233733-6001-4f55-a035-54dba75c7d7a"
+    }
+  }
+}
