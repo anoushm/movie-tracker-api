@@ -16,3 +16,6 @@ obj/
 
 # Cache files
 *.cache
+
+# Local secrets
+MovieTracker.Api/appsettings.Development.json
