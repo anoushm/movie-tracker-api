@@ -106,6 +106,26 @@ cd infrastructure
 ./deploy.sh demo RG-MovieTracker-Demo
 ```
 
+## CI/CD (GitHub Actions)
+
+Two workflows are included:
+
+- [Infrastructure deploy](.github/workflows/infra-deploy.yml): validates Bicep on PRs and deploys on main.
+- [ACR build and push](.github/workflows/acr-build-push.yml): builds the API image and pushes to ACR on main.
+
+Required repository secrets:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+
+Default values in workflows:
+
+- Resource group: `RG-MovieTracker-Demo`
+- Location: `westus3`
+- ACR name: `movietracker`
+- Image name: `movie-tracker-api`
+
 ## License
 
 MIT

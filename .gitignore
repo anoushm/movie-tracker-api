@@ -19,3 +19,4 @@ obj/
 
 # Local secrets
 MovieTracker.Api/appsettings.Development.json
+#file:appsettings.Development.json
