@@ -173,7 +173,6 @@ module acrPullRole 'acr-pull-role.bicep' = {
 module rbac 'rbac.bicep' = {
   name: 'rbac-deployment'
   params: {
-    appInsightsId: appInsights.id
     containerAppPrincipalId: containerAppModule.outputs.containerAppPrincipalId
     keyVaultId: keyVault.outputs.keyVaultId
     userPrincipalId: userPrincipalId
