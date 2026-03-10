@@ -1,12 +1,14 @@
 # Movie Tracker API - Container App Deployment Script
-# Usage: .\deploy.ps1 -ResourceGroup RG-MovieTracker-Demo -Location westus2
+# Usage: .\deploy.ps1 [-Environment demo] [-ResourceGroup RG-MovieTracker-Demo] [-Location westus3]
 
 param(
+    [string]$Environment = 'demo',
     [string]$ResourceGroup = 'RG-MovieTracker-Demo',
     [string]$Location = 'westus3'
 )
 
 Write-Host "Movie Tracker API Deployment"
+Write-Host "Environment: $Environment"
 Write-Host "Resource Group: $ResourceGroup"
 Write-Host "Location: $Location"
 Write-Host ""
@@ -27,7 +29,7 @@ Write-Host "Deploying infrastructure..."
 az deployment group create `
     --resource-group $ResourceGroup `
     --template-file main.bicep `
-    --parameters demo.parameters.json `
+    --parameters "$Environment.parameters.json" `
     --output table
 
 # Show URL

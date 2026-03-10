@@ -55,7 +55,7 @@ jobs:
           scope: resourcegroup
           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./infrastructure/main.bicep
-          parameters: ./infrastructure/demo.parameters.json
+          parameters: ./infrastructure/${{ github.event.inputs.environment || 'demo' }}.parameters.json
           deploymentMode: Validate
 
   what-if:
@@ -80,7 +80,7 @@ jobs:
           scope: resourcegroup
           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./infrastructure/main.bicep
-          parameters: ./infrastructure/demo.parameters.json
+          parameters: ./infrastructure/${{ github.event.inputs.environment || 'demo' }}.parameters.json
           additionalArguments: --what-if
 
   deploy:
@@ -117,6 +117,16 @@ jobs:
           template: ./infrastructure/main.bicep
           parameters: ./infrastructure/${{ github.event.inputs.environment || 'demo' }}.parameters.json
           deploymentName: movie-tracker-${{ github.run_number }}
+
+      - name: Dump deployment failure details
+        if: failure()
+        run: |
+          DEPLOYMENT_NAME="movie-tracker-${{ github.run_number }}"
+          az deployment group operation list \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "$DEPLOYMENT_NAME" \
+            --query "[].{state:properties.provisioningState,type:properties.targetResource.resourceType,name:properties.targetResource.resourceName,code:properties.statusMessage.error.code,message:properties.statusMessage.error.message}" \
+            -o table || true
 
       - name: Output Deployment Info
         run: |

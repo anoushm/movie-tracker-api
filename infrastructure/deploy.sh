@@ -7,7 +7,7 @@ set -e
 
 ENVIRONMENT=${1:-demo}
 RESOURCE_GROUP=${2:-"RG-MovieTracker-Demo"}
-LOCATION="westus2"
+LOCATION="westus3"
 
 echo "=========================================="
 echo "Movie Tracker API - Container App Deploy"
@@ -41,7 +41,7 @@ echo "Validating Bicep template..."
 az deployment group validate \
     --resource-group "$RESOURCE_GROUP" \
     --template-file main.bicep \
-    --parameters "parameters/${ENVIRONMENT}.parameters.json" \
+    --parameters "${ENVIRONMENT}.parameters.json" \
     --output none
 
 echo "Validation successful!"
@@ -52,7 +52,7 @@ echo "Deploying infrastructure..."
 az deployment group create \
     --resource-group "$RESOURCE_GROUP" \
     --template-file main.bicep \
-    --parameters "parameters/${ENVIRONMENT}.parameters.json" \
+    --parameters "${ENVIRONMENT}.parameters.json" \
     --name "movie-tracker-deploy-$(date +%Y%m%d-%H%M%S)" \
     --output table
 

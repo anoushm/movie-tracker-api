@@ -147,7 +147,7 @@ module containerAppModule 'container-app.bicep' = {
     containerAppEnvironmentId: containerAppEnvironment.id
     environmentType: environmentType
     containerImage: containerImage
-    containerRegistryServer: '' //acr.outputs.loginServer
+    containerRegistryServer: ''
     containerCpu: containerCpu
     containerMemory: containerMemory
     targetPort: targetPort
