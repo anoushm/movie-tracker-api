@@ -116,6 +116,22 @@ jobs:
           template: ./infra/main.bicep
           parameters: ./infra/parameters/${{ github.event.inputs.environment || 'demo' }}.parameters.json
           deploymentName: movie-tracker-${{ github.run_number }}
+          
+      - name: Dump deployment failure details
+        if: failure()
+        run: |
+          DEPLOYMENT_NAME="movie-tracker-${{ github.run_number }}"
+          echo "=== Top-level error ==="
+          az deployment group show \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "$DEPLOYMENT_NAME" \
+            --query "properties.error" -o jsonc || true
+          echo "=== Per-resource operation details ==="
+          az deployment group operation list \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "$DEPLOYMENT_NAME" \
+            --query "[].{state:properties.provisioningState,type:properties.targetResource.resourceType,name:properties.targetResource.resourceName,code:properties.statusMessage.error.code,message:properties.statusMessage.error.message}" \
+            -o table || true
 
       - name: Output Deployment Info
         run: |
