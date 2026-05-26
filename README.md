@@ -43,7 +43,7 @@ flowchart TB
 
 ```
 MovieTracker.Api/          # ASP.NET Core Web API
-infrastructure/            # Azure Bicep templates + deploy scripts
+infrastructure/            # Azure Bicep templates
 movie-tracker-api.slnx     # Solution
 ```
 
@@ -92,19 +92,7 @@ OpenAPI is available at `/openapi/v1.json` in Development.
 
 ## Infrastructure Deployment
 
-Quick start using the PowerShell script:
-
-```powershell
-cd infrastructure
-./deploy.ps1 -ResourceGroup RG-MovieTracker-Demo -Location westus3
-```
-
-Or use the bash script:
-
-```bash
-cd infrastructure
-./deploy.sh demo RG-MovieTracker-Demo
-```
+Infrastructure is deployed via the GitHub Actions workflow [`infra-deploy.yml`](.github/workflows/infra-deploy.yml). It validates Bicep on PRs and deploys on pushes to `main`, and can also be triggered manually with `workflow_dispatch` to pick an environment.
 
 ## CI/CD (GitHub Actions)
 

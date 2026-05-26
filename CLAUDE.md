@@ -44,7 +44,6 @@ MovieTracker.Api/           # Main API project
   Dockerfile                # Container configuration
 infrastructure/             # Azure Bicep IaC templates
   main.bicep                # Main infrastructure template
-  deploy.ps1 / deploy.sh    # Deployment scripts
 ```
 
 ## Key Endpoints

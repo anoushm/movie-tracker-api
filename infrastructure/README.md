@@ -56,9 +56,6 @@ movie-tracker-infra/
 ├── rbac.bicep                          # RBAC role assignments for managed identity
 ├── demo.bicepparam                     # Native Bicep parameters
 ├── demo.parameters.json                # JSON parameters for demo
-├── deploy.sh                           # Bash deployment script
-├── deploy.ps1                          # PowerShell deployment script
-├── deploy-infra.yml                    # GitHub Actions CI/CD workflow
 └── README.md
 ```
 
@@ -71,16 +68,6 @@ movie-tracker-infra/
 - Bicep CLI (comes with Azure CLI)
 
 ### Deploy via Azure CLI
-
-```bash
-# Using bash
-./deploy.sh demo RG-MovieTracker-Demo
-
-# Using PowerShell
-.\deploy.ps1 -Environment demo -ResourceGroup RG-MovieTracker-Demo
-```
-
-### Deploy Manually
 
 ```bash
 # Create resource group
