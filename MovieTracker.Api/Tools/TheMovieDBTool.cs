@@ -87,7 +87,12 @@ public class TheMovieDBTool
             return Result<DateTime?>.Success(null);
         }
 
-        if (!DateTime.TryParse(dateStr, out DateTime date))
+        if (!DateTime.TryParseExact(
+                dateStr,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out DateTime date))
         {
             return Result<DateTime?>.Failure(AppError.Validation($"Invalid {fieldName} format: {dateStr}. Use YYYY-MM-DD."));
         }
