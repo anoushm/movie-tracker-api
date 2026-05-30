@@ -2,23 +2,22 @@ using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using MovieTracker.Api.Core;
 using MovieTracker.Api.Tools;
-using System.ComponentModel;
-using System.Threading.Tasks;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-var config = builder.Configuration.GetSection("AzureOpenAI");
-var endpoint = new Uri(config["Endpoint"]!);
-var apiKey = new AzureKeyCredential(config["ApiKey"]!);
-var deploymentName = config["DeploymentName"]!;
-var agentName = config["AgentName"]!;
+IConfigurationSection config = builder.Configuration.GetSection("AzureOpenAI");
+Uri endpoint = new Uri(config["Endpoint"]!);
+AzureKeyCredential apiKey = new AzureKeyCredential(config["ApiKey"]!);
+string deploymentName = config["DeploymentName"]!;
 
 AIAgent movieAgent = new AzureOpenAIClient(endpoint, apiKey)
     .GetChatClient(deploymentName)
     .AsIChatClient()
     .CreateAIAgent(
-    instructions: "You are a helpful assistant in movie tracking.", name: "Movie Assistant");
+        instructions: "You are a helpful assistant in movie tracking.",
+        name: "Movie Assistant");
 
 AIAgent dateTimeAgent = new AzureOpenAIClient(endpoint, apiKey)
     .GetChatClient(deploymentName)
@@ -39,44 +38,44 @@ AIAgent dateTimeAgent = new AzureOpenAIClient(endpoint, apiKey)
 
 builder.Services.AddSingleton(movieAgent);
 builder.Services.AddSingleton(dateTimeAgent);
+builder.Services.AddSingleton<TheMovieDBTool>();
 
-var theMovieDbTool = new TheMovieDBTool(builder.Configuration);
+builder.Services.AddSingleton<AIAgent>(sp =>
+{
+    TheMovieDBTool theMovieDbTool = sp.GetRequiredService<TheMovieDBTool>();
 
-AIAgent theMovieDbAgent = new AzureOpenAIClient(endpoint, apiKey)
-    .GetChatClient(deploymentName)
-    .AsIChatClient()
-    .CreateAIAgent(
-        instructions: "You are a movie data assistant that answers using live TMDb data.",
-        name: "TheMovieDb Agent",
-        description: "Provides movie details, search, trailers, genres, keywords, and discovery via TMDb.",
-        tools: [
-            AIFunctionFactory.Create((Func<Task<string>>)theMovieDbTool.GetGenresList),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.SearchForPeople),
-            AIFunctionFactory.Create((Func<string, string?, Task<string>>)theMovieDbTool.SearchMovies),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.GetMovieTrailers),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.GetMovieWithTrailer),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.HandleGenericTrailerRequest),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.GetMovieDetails),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.SearchKeywords),
-            AIFunctionFactory.Create((Func<string, Task<string>>)theMovieDbTool.DescribeMovie),
-            AIFunctionFactory.Create((Func<string?, string?, string?, string?, string?, double?, double?, int?, int?, Task<string>>)theMovieDbTool.DiscoverMovies)
-        ]);
-
-builder.Services.AddSingleton(theMovieDbTool);
-builder.Services.AddSingleton(theMovieDbAgent);
+    return new AzureOpenAIClient(endpoint, apiKey)
+        .GetChatClient(deploymentName)
+        .AsIChatClient()
+        .CreateAIAgent(
+            instructions: "You are a movie data assistant that answers using live TMDb data.",
+            name: "TheMovieDb Agent",
+            description: "Provides movie details, search, trailers, genres, keywords, and discovery via TMDb.",
+            tools: [
+                AIFunctionFactory.Create(() => theMovieDbTool.GetGenresList().UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string personName) => theMovieDbTool.SearchForPeople(personName).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string movieTitle, string? releaseYear) => theMovieDbTool.SearchMovies(movieTitle, releaseYear).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieTrailers(movieId).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieWithTrailer(movieId).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string userQuery) => theMovieDbTool.HandleGenericTrailerRequest(userQuery).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieDetails(movieId).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string keyword) => theMovieDbTool.SearchKeywords(keyword).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string movieId) => theMovieDbTool.DescribeMovie(movieId).UnwrapForAgentAsync()),
+                AIFunctionFactory.Create((string? releaseDateFrom, string? releaseDateTo, string? castIds, string? genreIds, string? keywordIds, double? minVoteAverage, double? maxVoteAverage, int? minVoteCount, int? maxVoteCount) =>
+                    theMovieDbTool.DiscoverMovies(releaseDateFrom, releaseDateTo, castIds, genreIds, keywordIds, minVoteAverage, maxVoteAverage, minVoteCount, maxVoteCount).UnwrapForAgentAsync())
+            ]);
+});
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-// Only use HTTPS redirection when not in a container
 if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Container"))
 {
     app.UseHttpsRedirection();
@@ -84,7 +83,6 @@ if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Container
 
 app.MapControllers();
 
-// Health check endpoints
 app.MapGet("/health", () => Results.Ok("healthy"))
     .WithName("Health")
     .WithOpenApi();
