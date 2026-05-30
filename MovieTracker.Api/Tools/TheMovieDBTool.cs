@@ -17,7 +17,7 @@ public class TheMovieDBTool
 
     public TheMovieDBTool(IConfiguration configuration, ILogger<TheMovieDBTool> logger)
     {
-        this.apiKey = configuration["TheMovieDb:Api-Key"] ?? throw new ArgumentNullException("Missing The Movie Db Api Key");
+        this.apiKey = configuration["TheMovieDb:Api-Key"] ?? throw new InvalidOperationException("Missing configuration value: TheMovieDb:Api-Key");
         this.logger = logger;
     }
 
