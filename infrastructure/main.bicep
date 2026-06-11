@@ -141,9 +141,6 @@ module keyVault 'key-vault.bicep' = {
 
 module containerAppModule 'container-app.bicep' = {
   name: 'container-app-deployment'
-  dependsOn: [
-    acr
-  ]
   params: {
     location: location
     containerAppName: containerAppName
