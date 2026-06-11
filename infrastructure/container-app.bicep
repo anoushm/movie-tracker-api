@@ -11,10 +11,10 @@ param externalIngress bool
 param minReplicas int
 param maxReplicas int
 param appInsightsConnectionString string
-param azureOpenAIEndpoint string
-param azureOpenAIDeployment string
 @secure()
-param azureOpenAIKey string
+param azureOpenAIKey string = ''
+@secure()
+param theMovieDbApiKey string = ''
 param commonTags object
 
 var baseSecrets = [
@@ -31,7 +31,14 @@ var openAISecret = !empty(azureOpenAIKey) ? [
   }
 ] : []
 
-var allSecrets = concat(baseSecrets, openAISecret)
+var theMovieDbSecret = !empty(theMovieDbApiKey) ? [
+  {
+    name: 'themoviedb-api-key'
+    value: theMovieDbApiKey
+  }
+] : []
+
+var allSecrets = concat(baseSecrets, openAISecret, theMovieDbSecret)
 
 var baseEnvVars = [
   {
@@ -42,28 +49,23 @@ var baseEnvVars = [
     name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
     secretRef: 'appinsights-connection-string'
   }
-  {
-    name: 'OTEL_EXPORTER_OTLP_ENDPOINT'
-    value: ''
-  }
 ]
 
-var openAIEnvVars = !empty(azureOpenAIEndpoint) ? [
+var openAIEnvVars = !empty(azureOpenAIKey) ? [
   {
-    name: 'AZURE_OPENAI_ENDPOINT'
-    value: azureOpenAIEndpoint
-  }
-  {
-    name: 'AZURE_OPENAI_DEPLOYMENT'
-    value: azureOpenAIDeployment
-  }
-  {
-    name: 'AZURE_OPENAI_API_KEY'
+    name: 'AzureOpenAI__ApiKey'
     secretRef: 'azure-openai-key'
   }
 ] : []
 
-var allEnvVars = concat(baseEnvVars, openAIEnvVars)
+var theMovieDbEnvVars = !empty(theMovieDbApiKey) ? [
+  {
+    name: 'TheMovieDb__Api-Key'
+    secretRef: 'themoviedb-api-key'
+  }
+] : []
+
+var allEnvVars = concat(baseEnvVars, openAIEnvVars, theMovieDbEnvVars)
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName

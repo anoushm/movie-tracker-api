@@ -47,15 +47,13 @@ param minReplicas int = 0
 @description('Maximum number of replicas')
 param maxReplicas int = 5
 
-@description('Azure OpenAI endpoint (optional)')
-param azureOpenAIEndpoint string = ''
-
-@description('Azure OpenAI deployment name (optional)')
-param azureOpenAIDeployment string = ''
+@secure()
+@description('Azure OpenAI API Key (pass at deploy time)')
+param azureOpenAIKey string = ''
 
 @secure()
-@description('Azure OpenAI API Key (optional)')
-param azureOpenAIKey string = ''
+@description('TheMovieDb API Key (pass at deploy time)')
+param theMovieDbApiKey string = ''
 
 var commonTags = {
   domain: 'movie-tracker'
@@ -63,6 +61,8 @@ var commonTags = {
   project: 'movie-tracker-agent'
   framework: 'ms-agent-framework'
 }
+
+var usePrivateRegistry = contains(containerImage, '.azurecr.io')
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -147,7 +147,7 @@ module containerAppModule 'container-app.bicep' = {
     containerAppEnvironmentId: containerAppEnvironment.id
     environmentType: environmentType
     containerImage: containerImage
-    containerRegistryServer: ''
+    containerRegistryServer: usePrivateRegistry ? acr.outputs.loginServer : ''
     containerCpu: containerCpu
     containerMemory: containerMemory
     targetPort: targetPort
@@ -155,9 +155,8 @@ module containerAppModule 'container-app.bicep' = {
     minReplicas: minReplicas
     maxReplicas: maxReplicas
     appInsightsConnectionString: appInsights.properties.ConnectionString
-    azureOpenAIEndpoint: azureOpenAIEndpoint
-    azureOpenAIDeployment: azureOpenAIDeployment
     azureOpenAIKey: azureOpenAIKey
+    theMovieDbApiKey: theMovieDbApiKey
     commonTags: commonTags
   }
 }

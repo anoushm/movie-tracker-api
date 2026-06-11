@@ -24,13 +24,13 @@
       "value": "movietracker"
     },
     "containerImage": {
-      "value": "mcr.microsoft.com/k8se/quickstart:latest"
+      "value": "movietracker.azurecr.io/movie-tracker-api:latest"
     },
     "containerCpu": {
-      "value": "0.5"
+      "value": "0.25"
     },
     "containerMemory": {
-      "value": "1Gi"
+      "value": "0.5Gi"
     },
     "targetPort": {
       "value": 8080
@@ -42,16 +42,7 @@
       "value": 0
     },
     "maxReplicas": {
-      "value": 5
-    },
-    "azureOpenAIEndpoint": {
-      "value": ""
-    },
-    "azureOpenAIDeployment": {
-      "value": ""
-    },
-    "azureOpenAIKey": {
-      "value": ""
+      "value": 3
     },
     "keyVaultName": {
       "value": "movie-tracker-kv"
