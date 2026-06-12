@@ -16,7 +16,7 @@ param managedIdentityId string
 param managedIdentityClientId string
 param commonTags object
 
-var keyVaultUri = 'https://${keyVaultName}.vault.azure.net/secrets'
+var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/secrets'
 
 var secrets = [
   {
@@ -151,4 +151,4 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 output containerAppId string = containerApp.id
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output containerAppName string = containerApp.name
-output containerAppPrincipalId string = managedIdentityClientId
+output managedIdentityClientId string = managedIdentityClientId

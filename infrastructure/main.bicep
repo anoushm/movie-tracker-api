@@ -155,7 +155,7 @@ resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existin
 
 resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: existingKeyVault
-  name: guid(keyVault.outputs.keyVaultId, managedIdentity.id, keyVaultSecretsUserRoleId)
+  name: guid(keyVaultName, managedIdentity.name, keyVaultSecretsUserRoleId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
     principalId: managedIdentity.properties.principalId
@@ -165,7 +165,7 @@ resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: existingAcr
-  name: guid(acr.outputs.registryId, managedIdentity.id, acrPullRoleId)
+  name: guid(acrName, managedIdentity.name, acrPullRoleId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
     principalId: managedIdentity.properties.principalId
@@ -203,7 +203,6 @@ module containerAppModule 'container-app.bicep' = {
 module rbac 'rbac.bicep' = if (!empty(userPrincipalId)) {
   name: 'rbac-deployment'
   params: {
-    containerAppPrincipalId: managedIdentity.properties.principalId
     keyVaultId: keyVault.outputs.keyVaultId
     userPrincipalId: userPrincipalId
   }

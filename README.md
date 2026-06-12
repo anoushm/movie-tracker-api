@@ -43,7 +43,7 @@ The following resources are provisioned by the Bicep templates:
 
 - Resource Group: `RG-MovieTracker-Demo`
 - Container Registry: `movietracker.azurecr.io`
-- Container Apps Environment: `movietracker`
+- Container Apps Environment: `movie-tracker-env`
 - Container App: `movie-tracker-api`
 - Key Vault: `movie-tracker-kv`
 - Azure OpenAI: `movie-tracker-openai` (in `Rg-Movie-Tracker`)

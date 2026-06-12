@@ -1,6 +1,3 @@
-@description('The principal ID of the Container App managed identity')
-param containerAppPrincipalId string
-
 @description('The resource ID of the Key Vault')
 param keyVaultId string = ''
 
