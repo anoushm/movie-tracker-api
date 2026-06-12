@@ -37,6 +37,7 @@ concurrency:
 env:
   AZURE_RESOURCE_GROUP: RG-MovieTracker-Demo
   AZURE_LOCATION: westus3
+  CONTAINER_APP_NAME: movie-tracker-api
 
 jobs:
   validate:
@@ -78,6 +79,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Read Current Container App Image Into Environment
+        run: |
+          CURRENT_IMAGE=$(az containerapp show \
+            -n ${{ env.CONTAINER_APP_NAME }} \
+            -g ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "properties.template.containers[0].image" \
+            -o tsv 2>/dev/null || true)
+          echo "CURRENT_IMAGE=$CURRENT_IMAGE" >> $GITHUB_ENV
+
       - name: What-If
         uses: azure/arm-deploy@v2
         with:
@@ -85,7 +95,7 @@ jobs:
           resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
           template: ./infrastructure/main.bicep
           parameters: ./infrastructure/${{ github.event.inputs.environment || 'demo' }}.parameters.json
-          additionalArguments: --what-if
+          additionalArguments: --what-if ${{ env.CURRENT_IMAGE != '' && format('--parameters containerImage={0}', env.CURRENT_IMAGE) || '' }}
 
   deploy:
     name: Deploy Infrastructure
@@ -115,7 +125,7 @@ jobs:
       - name: Read Current Container App Image Into Environment
         run: |
           CURRENT_IMAGE=$(az containerapp show \
-            -n movie-tracker-api \
+            -n ${{ env.CONTAINER_APP_NAME }} \
             -g ${{ env.AZURE_RESOURCE_GROUP }} \
             --query "properties.template.containers[0].image" \
             -o tsv 2>/dev/null || true)

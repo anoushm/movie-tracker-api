@@ -20,6 +20,8 @@ concurrency:
 env:
   ACR_NAME: movietracker
   IMAGE_NAME: movie-tracker-api
+  AZURE_RESOURCE_GROUP: RG-MovieTracker-Demo
+  CONTAINER_APP_NAME: movie-tracker-api
 
 jobs:
   build-and-push:
@@ -55,13 +57,13 @@ jobs:
       - name: Update Container App To New Image Tag
         run: |
           az containerapp update \
-            -n movie-tracker-api \
-            -g RG-MovieTracker-Demo \
-            --image movietracker.azurecr.io/movie-tracker-api:$IMAGE_TAG
+            -n ${{ env.CONTAINER_APP_NAME }} \
+            -g ${{ env.AZURE_RESOURCE_GROUP }} \
+            --image ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:$IMAGE_TAG
 
       - name: Purge Old ACR Image Tags Keeping Last Two
         run: |
           az acr run \
-            --registry movietracker \
-            --cmd "acr purge --filter 'movie-tracker-api:.*' --ago 0d --keep 2 --untagged" \
+            --registry ${{ env.ACR_NAME }} \
+            --cmd "acr purge --filter '${{ env.IMAGE_NAME }}:.*' --ago 0d --keep 2 --untagged" \
             /dev/null
