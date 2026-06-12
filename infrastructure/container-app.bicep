@@ -11,36 +11,31 @@ param externalIngress bool
 param minReplicas int
 param maxReplicas int
 param appInsightsConnectionString string
-@secure()
-param azureOpenAIKey string = ''
-@secure()
-param theMovieDbApiKey string = ''
+param keyVaultName string
+param managedIdentityId string
+param managedIdentityClientId string
 param commonTags object
 
-var baseSecrets = [
+var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/secrets'
+
+var secrets = [
   {
     name: 'appinsights-connection-string'
     value: appInsightsConnectionString
   }
-]
-
-var openAISecret = !empty(azureOpenAIKey) ? [
   {
     name: 'azure-openai-key'
-    value: azureOpenAIKey
+    keyVaultUrl: '${keyVaultUri}/azure-openai-key'
+    identity: managedIdentityId
   }
-] : []
-
-var theMovieDbSecret = !empty(theMovieDbApiKey) ? [
   {
     name: 'themoviedb-api-key'
-    value: theMovieDbApiKey
+    keyVaultUrl: '${keyVaultUri}/themoviedb-api-key'
+    identity: managedIdentityId
   }
-] : []
+]
 
-var allSecrets = concat(baseSecrets, openAISecret, theMovieDbSecret)
-
-var baseEnvVars = [
+var envVars = [
   {
     name: 'ASPNETCORE_ENVIRONMENT'
     value: environmentType == 'prod' ? 'Production' : 'Development'
@@ -49,30 +44,25 @@ var baseEnvVars = [
     name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
     secretRef: 'appinsights-connection-string'
   }
-]
-
-var openAIEnvVars = !empty(azureOpenAIKey) ? [
   {
     name: 'AzureOpenAI__ApiKey'
     secretRef: 'azure-openai-key'
   }
-] : []
-
-var theMovieDbEnvVars = !empty(theMovieDbApiKey) ? [
   {
     name: 'TheMovieDb__Api-Key'
     secretRef: 'themoviedb-api-key'
   }
-] : []
-
-var allEnvVars = concat(baseEnvVars, openAIEnvVars, theMovieDbEnvVars)
+]
 
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   tags: commonTags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentityId}': {}
+    }
   }
   properties: {
     environmentId: containerAppEnvironmentId
@@ -101,10 +91,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: !empty(containerRegistryServer) ? [
         {
           server: containerRegistryServer
-          identity: 'system'
+          identity: managedIdentityId
         }
       ] : []
-      secrets: allSecrets
+      secrets: secrets
     }
     template: {
       containers: [
@@ -115,7 +105,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(containerCpu)
             memory: containerMemory
           }
-          env: allEnvVars
+          env: envVars
           probes: [
             {
               type: 'Liveness'
@@ -161,4 +151,4 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 output containerAppId string = containerApp.id
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
 output containerAppName string = containerApp.name
-output containerAppPrincipalId string = containerApp.identity.principalId
+output managedIdentityClientId string = managedIdentityClientId
