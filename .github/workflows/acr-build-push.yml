@@ -13,6 +13,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: movie-tracker-aca-deploy
+  cancel-in-progress: false
+
 env:
   ACR_NAME: movietracker
   IMAGE_NAME: movie-tracker-api
@@ -25,6 +29,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute Image Tag From Run Number And Short SHA
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "IMAGE_TAG=${{ github.run_number }}-$SHORT_SHA" >> $GITHUB_ENV
+
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -32,11 +41,24 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and Push Image
+      - name: Build and Push Image to ACR
         run: |
           az acr build \
             --registry ${{ env.ACR_NAME }} \
-            --image ${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            --image ${{ env.IMAGE_NAME }}:latest \
+            --image ${{ env.IMAGE_NAME }}:$IMAGE_TAG \
             --file MovieTracker.Api/Dockerfile \
             MovieTracker.Api
+
+      - name: Update Container App To New Image Tag
+        run: |
+          az containerapp update \
+            -n movie-tracker-api \
+            -g RG-MovieTracker-Demo \
+            --image movietracker.azurecr.io/movie-tracker-api:$IMAGE_TAG
+
+      - name: Purge Old ACR Image Tags Keeping Last Two
+        run: |
+          az acr run \
+            --registry movietracker \
+            --cmd "acr purge --filter 'movie-tracker-api:.*' --ago 0d --keep 2 --untagged" \
+            /dev/null
