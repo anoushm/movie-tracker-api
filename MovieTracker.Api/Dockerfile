@@ -28,5 +28,11 @@ RUN dotnet publish "./MovieTracker.Api.csproj" -c $BUILD_CONFIGURATION -o /app/p
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
 WORKDIR /app
+ARG IMAGE_TAG=local
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV IMAGE_TAG=$IMAGE_TAG
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "MovieTracker.Api.dll"]

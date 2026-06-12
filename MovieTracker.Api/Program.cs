@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Azure;
 using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
@@ -91,12 +93,24 @@ app.MapGet("/health/ready", () => Results.Ok("ready"))
     .WithName("Ready")
     .WithOpenApi();
 
-app.MapGet("/version", () => new
+app.MapGet("/version", () =>
 {
-    Version = typeof(Program).Assembly.GetName().Version?.ToString(),
-    BuildTime = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location).ToString("o"),
-    Environment = app.Environment.EnvironmentName,
-    MachineName = Environment.MachineName
+    using Process currentProcess = Process.GetCurrentProcess();
+    DateTime processStartedAt = currentProcess.StartTime.ToUniversalTime();
+    TimeSpan uptime = DateTime.UtcNow - processStartedAt;
+    return new
+    {
+        ImageTag = Environment.GetEnvironmentVariable("IMAGE_TAG") ?? "unknown",
+        GitSha = Environment.GetEnvironmentVariable("GIT_SHA") ?? "unknown",
+        BuildTime = Environment.GetEnvironmentVariable("BUILD_TIME") ?? "unknown",
+        AssemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString(),
+        Revision = Environment.GetEnvironmentVariable("CONTAINER_APP_REVISION") ?? "local",
+        Replica = Environment.GetEnvironmentVariable("CONTAINER_APP_REPLICA_NAME") ?? Environment.MachineName,
+        Environment = app.Environment.EnvironmentName,
+        Framework = RuntimeInformation.FrameworkDescription,
+        StartedAt = processStartedAt.ToString("o"),
+        Uptime = uptime.ToString("c")
+    };
 });
 
 app.Run();
