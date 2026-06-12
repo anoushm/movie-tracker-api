@@ -12,12 +12,10 @@ shared logic at the lowest common layer.
 
 ## Project-specific rules
 - **Secrets never live in source.** No keys, connection strings, or tokens in
-  `appsettings*.json`. Local dev uses user-secrets; deployed config uses Container Apps
-  secrets injected as environment variables at deploy time.
-- **Secrets flow:** Secrets are passed to Bicep at deploy time → stored as Container App
-  secrets → injected as env vars that override `appsettings.json` placeholders. Key Vault
-  is provisioned for future use (e.g., certificate storage, rotation) but secrets currently
-  flow through Container Apps native secret management.
+  `appsettings*.json`. Local dev uses user-secrets; deployed environments pull from Key Vault.
+- **Key Vault is the source of truth for secrets.** The Container App uses a User-Assigned
+  Managed Identity with Key Vault Secrets User role to pull secrets at deployment time.
+  Secrets must exist in Key Vault BEFORE deploying the infrastructure.
 - **Config binding:** C# uses hierarchical keys (`AzureOpenAI:Endpoint`). When setting
   these as container env vars in Bicep, use the double-underscore form
   (`AzureOpenAI__Endpoint`) so .NET binds them correctly. Do not mix flat

@@ -47,14 +47,6 @@ param minReplicas int = 0
 @description('Maximum number of replicas')
 param maxReplicas int = 5
 
-@secure()
-@description('Azure OpenAI API Key (pass at deploy time)')
-param azureOpenAIKey string = ''
-
-@secure()
-@description('TheMovieDb API Key (pass at deploy time)')
-param theMovieDbApiKey string = ''
-
 var commonTags = {
   domain: 'movie-tracker'
   env: environmentType
@@ -63,6 +55,14 @@ var commonTags = {
 }
 
 var usePrivateRegistry = contains(containerImage, '.azurecr.io')
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+
+resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${containerAppName}-identity'
+  location: location
+  tags: commonTags
+}
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -139,6 +139,40 @@ module keyVault 'key-vault.bicep' = {
   }
 }
 
+resource existingKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyVaultName
+  dependsOn: [
+    keyVault
+  ]
+}
+
+resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+  dependsOn: [
+    acr
+  ]
+}
+
+resource kvSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: existingKeyVault
+  name: guid(keyVault.outputs.keyVaultId, managedIdentity.id, keyVaultSecretsUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: existingAcr
+  name: guid(acr.outputs.registryId, managedIdentity.id, acrPullRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 module containerAppModule 'container-app.bicep' = {
   name: 'container-app-deployment'
   params: {
@@ -155,24 +189,21 @@ module containerAppModule 'container-app.bicep' = {
     minReplicas: minReplicas
     maxReplicas: maxReplicas
     appInsightsConnectionString: appInsights.properties.ConnectionString
-    azureOpenAIKey: azureOpenAIKey
-    theMovieDbApiKey: theMovieDbApiKey
+    keyVaultName: keyVaultName
+    managedIdentityId: managedIdentity.id
+    managedIdentityClientId: managedIdentity.properties.clientId
     commonTags: commonTags
   }
+  dependsOn: [
+    kvSecretsUserRole
+    acrPullRole
+  ]
 }
 
-module acrPullRole 'acr-pull-role.bicep' = {
-  name: 'acr-pull-role-deployment'
-  params: {
-    registryName: acr.outputs.registryName
-    principalId: containerAppModule.outputs.containerAppPrincipalId
-  }
-}
-
-module rbac 'rbac.bicep' = {
+module rbac 'rbac.bicep' = if (!empty(userPrincipalId)) {
   name: 'rbac-deployment'
   params: {
-    containerAppPrincipalId: containerAppModule.outputs.containerAppPrincipalId
+    containerAppPrincipalId: managedIdentity.properties.principalId
     keyVaultId: keyVault.outputs.keyVaultId
     userPrincipalId: userPrincipalId
   }
@@ -191,3 +222,5 @@ output acrRegistryId string = acr.outputs.registryId
 output keyVaultUri string = keyVault.outputs.keyVaultUri
 output keyVaultName string = keyVault.outputs.keyVaultName
 output keyVaultId string = keyVault.outputs.keyVaultId
+output managedIdentityId string = managedIdentity.id
+output managedIdentityPrincipalId string = managedIdentity.properties.principalId

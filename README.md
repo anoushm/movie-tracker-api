@@ -1,119 +1,130 @@
 # Movie Tracker API
 
-Movie Tracker API is a .NET 10 Web API that uses the Microsoft Agent Framework with Azure OpenAI and TMDb to answer movie-related questions. It ships with Azure Bicep infrastructure for deployment to Azure Container Apps.
+A .NET 10 movie-assistant API using Azure OpenAI and TheMovieDB. Deployed to Azure Container Apps via Bicep.
 
-## Highlights
+## Prerequisites
 
-- .NET 10 Web API with minimal hosting
-- Microsoft Agent Framework agents wired to Azure OpenAI
-- TMDb integration for live movie data
-- Azure Container Apps deployment via Bicep
-- Observability with Application Insights + Log Analytics
+### 1. Key Vault Secrets (Required Before Deployment)
 
-## Architecture (Bicep)
+The Azure Container App pulls secrets from Key Vault at deployment time. **These secrets must exist in Key Vault BEFORE deploying the infrastructure**, otherwise the Container App deployment will fail.
 
-The infrastructure is modeled in [infrastructure/main.bicep](infrastructure/main.bicep) and composed of smaller modules. The diagram below mirrors how the resources are wired.
+| Secret Name | Description | How to Obtain |
+|-------------|-------------|---------------|
+| `azure-openai-key` | Azure OpenAI API key | Azure Portal → Cognitive Services → Keys |
+| `themoviedb-api-key` | TheMovieDB API key | https://www.themoviedb.org/settings/api |
 
-```mermaid
-flowchart TB
-  subgraph RG[Resource Group]
-    LA[Log Analytics Workspace]
-    AI[Application Insights]
-    ENV[Container Apps Environment]
-    CA[Container App: movie-tracker-api]
-    ACR[Azure Container Registry]
-    KV[Azure Key Vault]
+#### Setup Commands
 
-    LA --> AI
-    LA --> ENV
-    ENV --> CA
-    ACR --> CA
-    KV --> CA
-  end
+```bash
+# Set Azure OpenAI key
+az keyvault secret set --vault-name movie-tracker-kv --name azure-openai-key --value "<your-azure-openai-key>"
 
-  subgraph RBAC[Role Assignments]
-    CAID[Container App Managed Identity]
-    CAID -->|AcrPull| ACR
-    CAID -->|Secrets User| KV
-    CAID -->|Monitoring Reader/Publisher| AI
-  end
+# Set TheMovieDB key
+az keyvault secret set --vault-name movie-tracker-kv --name themoviedb-api-key --value "<your-themoviedb-key>"
 ```
 
-## Repository Layout
+#### Verify Secrets Exist
 
-```
-MovieTracker.Api/          # ASP.NET Core Web API
-infrastructure/            # Azure Bicep templates
-movie-tracker-api.slnx     # Solution
+```bash
+az keyvault secret list --vault-name movie-tracker-kv --query "[].name" -o tsv
 ```
 
-## API Overview
+Expected output:
+```
+azure-openai-key
+themoviedb-api-key
+```
 
-### Endpoints
+> ⚠️ **Important**: If you deploy the Container App before these secrets exist, the deployment will fail with a Key Vault reference error. Always run the setup commands above first.
 
-- `POST /Ask` - Sends a user question to the configured agent and returns a response.
-- `GET /weatherforecast` - Sample endpoint from the default template.
-- `GET /health` - Liveness probe.
-- `GET /health/ready` - Readiness probe.
-- `GET /version` - Build metadata.
+### 2. Azure Resources
 
-### Agents and Tools
+The following resources are provisioned by the Bicep templates:
 
-The API wires multiple agents:
+- Resource Group: `RG-MovieTracker-Demo`
+- Container Registry: `movietracker.azurecr.io`
+- Container Apps Environment: `movietracker`
+- Container App: `movie-tracker-api`
+- Key Vault: `movie-tracker-kv`
+- Azure OpenAI: `movie-tracker-openai` (in `Rg-Movie-Tracker`)
 
-- Movie assistant agent for general movie Q&A.
-- Date/time agent with utilities for relative date ranges.
-- TMDb agent that uses `TMDbLib` to search, discover, and fetch trailers.
+## Deployment
 
-These are configured in `Program.cs` and backed by tool classes in `MovieTracker.Api/Tools`.
+### First-Time Setup
 
-### Configuration
+1. **Add secrets to Key Vault** (see Prerequisites above)
 
-Configuration is read from `appsettings.json` and environment variables. The Azure OpenAI section expects:
+2. **Deploy infrastructure:**
+   ```bash
+   cd infrastructure
+   az deployment group create \
+     --resource-group RG-MovieTracker-Demo \
+     --template-file main.bicep \
+     --parameters demo.parameters.json
+   ```
 
-- `AzureOpenAI:Endpoint`
-- `AzureOpenAI:ApiKey`
-- `AzureOpenAI:DeploymentName`
+3. **Build and push container image:**
+   ```bash
+   az acr build --registry movietracker --image movie-tracker-api:latest .
+   ```
 
-TMDb uses:
+### Subsequent Deployments
 
-- `TheMovieDB:Api-Key`
+CI/CD via GitHub Actions handles deployments automatically on push to `main`.
 
-Use user-secrets or environment variables for local development.
+## Secret Rotation
+
+To rotate secrets:
+
+1. Update the secret in Key Vault:
+   ```bash
+   az keyvault secret set --vault-name movie-tracker-kv --name azure-openai-key --value "<new-key>"
+   ```
+
+2. Restart the Container App to pull new secret:
+   ```bash
+   az containerapp revision restart -n movie-tracker-api -g RG-MovieTracker-Demo --revision <revision-name>
+   ```
+
+   Or create a new revision:
+   ```bash
+   az containerapp update -n movie-tracker-api -g RG-MovieTracker-Demo
+   ```
 
 ## Local Development
 
+Use .NET User Secrets (secrets never in source):
+
 ```bash
-dotnet restore MovieTracker.Api/MovieTracker.Api.csproj
-dotnet run --project MovieTracker.Api/MovieTracker.Api.csproj
+cd MovieTracker.Api
+dotnet user-secrets set "AzureOpenAI:ApiKey" "<your-key>"
+dotnet user-secrets set "TheMovieDb:Api-Key" "<your-key>"
 ```
 
-OpenAPI is available at `/openapi/v1.json` in Development.
+## API Endpoints
 
-## Infrastructure Deployment
+| Endpoint | Description |
+|----------|-------------|
+| `POST /ask` | Ask the movie assistant a question |
+| `GET /health` | Liveness probe |
+| `GET /health/ready` | Readiness probe |
+| `GET /version` | Build info and environment |
 
-Infrastructure is deployed via the GitHub Actions workflow [`infra-deploy.yml`](.github/workflows/infra-deploy.yml). It validates Bicep on PRs and deploys on pushes to `main`, and can also be triggered manually with `workflow_dispatch` to pick an environment.
+## Architecture
 
-## CI/CD (GitHub Actions)
-
-Two workflows are included:
-
-- [Infrastructure deploy](.github/workflows/infra-deploy.yml): validates Bicep on PRs and deploys on main.
-- [ACR build and push](.github/workflows/acr-build-push.yml): builds the API image and pushes to ACR on main.
-
-Required repository secrets:
-
-- `AZURE_CLIENT_ID`
-- `AZURE_TENANT_ID`
-- `AZURE_SUBSCRIPTION_ID`
-
-Default values in workflows:
-
-- Resource group: `RG-MovieTracker-Demo`
-- Location: `westus3`
-- ACR name: `movietracker`
-- Image name: `movie-tracker-api`
-
-## License
-
-MIT
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Azure Container Apps                       │
+│  ┌─────────────────┐    ┌─────────────────┐                  │
+│  │ movie-tracker-  │───▶│   Key Vault     │                  │
+│  │      api        │    │ (secrets pull)  │                  │
+│  └────────┬────────┘    └─────────────────┘                  │
+│           │                                                   │
+└───────────┼───────────────────────────────────────────────────┘
+            │
+            ▼
+   ┌────────────────┐         ┌─────────────────┐
+   │  Azure OpenAI  │         │   TheMovieDB    │
+   │   (gpt-4o)     │         │      API        │
+   └────────────────┘         └─────────────────┘
+```
