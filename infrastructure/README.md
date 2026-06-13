@@ -134,6 +134,12 @@ az deployment group create \
 
 ## 🔄 CI/CD with GitHub Actions
 
+### First-Deploy Bootstrap
+
+On a clean resource group, `infra-deploy` cannot read an existing Container App image and the `containerImage` parameter is no longer in `demo.parameters.json`, so the Bicep default (`mcr.microsoft.com/k8se/quickstart:latest`) is used. The Container App will come up on the quickstart image. To land on the API image, run the `Build and Push API Image` workflow (or push a change under `MovieTracker.Api/**`) immediately after the first infra deploy — it builds the image, pushes it to ACR, and updates the Container App to the real tag. Subsequent infra deploys read the live image from the Container App and preserve it.
+
+The two workflows share a GitHub Actions `concurrency` group (`movie-tracker-aca-deploy`) so they serialize and never race on the Container App's image field.
+
 ### Setup
 
 1. Create a Service Principal:

@@ -23,9 +23,6 @@
     "acrName": {
       "value": "movietracker"
     },
-    "containerImage": {
-      "value": "movietracker.azurecr.io/movie-tracker-api:latest"
-    },
     "containerCpu": {
       "value": "0.25"
     },
