@@ -11,7 +11,7 @@ param tags object
 @allowed(['demo', 'dev', 'staging', 'prod'])
 param environmentType string
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2026-02-01' = {
   name: name
   location: location
   tags: tags
