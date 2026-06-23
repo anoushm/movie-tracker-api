@@ -139,7 +139,7 @@ module keyVault 'key-vault.bicep' = {
   }
 }
 
-resource existingKeyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource existingKeyVault 'Microsoft.KeyVault/vaults@2026-02-01' existing = {
   name: keyVaultName
   dependsOn: [
     keyVault

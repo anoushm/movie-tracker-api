@@ -6,7 +6,7 @@ param userPrincipalId string = ''
 
 var keyVaultAdministratorRoleId = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if (!empty(keyVaultId)) {
+resource keyVault 'Microsoft.KeyVault/vaults@2026-02-01' existing = if (!empty(keyVaultId)) {
   name: last(split(keyVaultId, '/'))
 }
 
