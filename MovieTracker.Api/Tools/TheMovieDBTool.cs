@@ -107,7 +107,7 @@ public class TheMovieDBTool
         Result<List<GenresItem>> result = await RunTmdbAsync(async client =>
         {
             var genres = await client.GetMovieGenresAsync();
-            return genres.Select(g => new GenresItem(g.Id.ToString(), g.Name)).ToList();
+            return genres!.Select(g => new GenresItem(g.Id.ToString(), g.Name!)).ToList();
         });
 
         return result.Match(
@@ -128,7 +128,7 @@ public class TheMovieDBTool
         Result<List<PersonSearchResult>> result = await RunTmdbAsync(async client =>
         {
             var searchResults = await client.SearchPersonAsync(personName, includeAdult: false, region: "en-US");
-            return searchResults.Results.Select(p => new PersonSearchResult(p.Id.ToString(), p.Name)).ToList();
+            return searchResults!.Results!.Select(p => new PersonSearchResult(p.Id.ToString(), p.Name!)).ToList();
         });
 
         return result.Match(
@@ -165,14 +165,14 @@ public class TheMovieDBTool
             var searchResults = await client.SearchMovieAsync(movieTitle, year: yearAsInt);
             List<MovieSearchResult> movieSearchResults = new List<MovieSearchResult>();
 
-            foreach (var movie in searchResults.Results)
+            foreach (var movie in searchResults!.Results!)
             {
                 var externalIds = await client.GetMovieExternalIdsAsync(movie.Id);
                 movieSearchResults.Add(new MovieSearchResult(
                     movie.Id.ToString(),
-                    movie.Title,
+                    movie.Title!,
                     movie.ReleaseDate?.ToString("yyyy-MM-dd") ?? "",
-                    externalIds.ImdbId ?? ""
+                    externalIds!.ImdbId ?? ""
                 ));
             }
 
@@ -208,7 +208,7 @@ public class TheMovieDBTool
         {
             var videos = await client.GetMovieVideosAsync(id);
 
-            var allVideos = videos.Results
+            var allVideos = videos!.Results!
                 .Where(v => v.Site == "YouTube")
                 .Select(v => new
                 {
@@ -232,7 +232,7 @@ public class TheMovieDBTool
 
             return JsonSerializer.Serialize(new
             {
-                MovieTitle = movie.Title,
+                MovieTitle = movie!.Title,
                 MovieYear = movie.ReleaseDate?.Year,
                 TotalVideoCount = allVideos.Count,
                 MainTrailer = trailers.FirstOrDefault(t => t.Official) ?? trailers.FirstOrDefault() ?? allVideos.FirstOrDefault(),
@@ -271,7 +271,7 @@ public class TheMovieDBTool
             var movie = await client.GetMovieAsync(id);
             var videos = await client.GetMovieVideosAsync(id);
 
-            var trailer = videos.Results
+            var trailer = videos!.Results!
                 .Where(v => v.Type == "Trailer" && v.Site == "YouTube")
                 .OrderByDescending(v => v.Official)
                 .FirstOrDefault();
@@ -279,7 +279,7 @@ public class TheMovieDBTool
             return JsonSerializer.Serialize(new
             {
                 MovieId = movieId,
-                Title = movie.Title,
+                Title = movie!.Title,
                 Overview = movie.Overview,
                 ReleaseDate = movie.ReleaseDate?.ToString("yyyy-MM-dd"),
                 ImdbId = movie.ImdbId ?? "",
@@ -287,7 +287,7 @@ public class TheMovieDBTool
                 Trailer = trailer != null ? new
                 {
                     HasTrailer = true,
-                    Name = trailer.Name,
+                    Name = trailer.Name!,
                     YouTubeUrl = $"https://www.youtube.com/watch?v={trailer.Key}",
                     EmbedUrl = $"https://www.youtube.com/embed/{trailer.Key}",
                     ThumbnailUrl = $"https://img.youtube.com/vi/{trailer.Key}/maxresdefault.jpg",
@@ -351,10 +351,10 @@ public class TheMovieDBTool
             var movieDetails = new
             {
                 MovieId = movieId,
-                Title = movie.Title,
+                Title = movie!.Title,
                 Overview = movie.Overview,
                 ReleaseDate = movie.ReleaseDate?.ToString("yyyy-MM-dd"),
-                Genres = movie.Genres.Select(g => new { Id = g.Id, Name = g.Name }).ToList(),
+                Genres = movie.Genres!.Select(g => new { Id = g.Id, Name = g.Name }).ToList(),
                 Runtime = movie.Runtime,
                 VoteAverage = movie.VoteAverage,
                 VoteCount = movie.VoteCount,
@@ -382,7 +382,7 @@ public class TheMovieDBTool
         Result<List<object>> result = await RunTmdbAsync(async client =>
         {
             var keywords = await client.SearchKeywordAsync(keyword);
-            return keywords.Results.Select(k => (object)new { KeywordId = k.Id, Name = k.Name }).ToList();
+            return keywords!.Results!.Select(k => (object)new { KeywordId = k.Id, Name = k.Name }).ToList();
         });
 
         return result.Match(
@@ -413,7 +413,7 @@ public class TheMovieDBTool
         Result<string> result = await RunTmdbAsync(async client =>
         {
             var movie = await client.GetMovieAsync(id);
-            var credits = await client.GetMovieCreditsAsync(movie.Id);
+            var credits = await client.GetMovieCreditsAsync(movie!.Id);
 
             var movieData = new
             {
@@ -421,13 +421,13 @@ public class TheMovieDBTool
                 Title = movie.Title,
                 Overview = movie.Overview,
                 ReleaseDate = movie.ReleaseDate?.ToString("yyyy-MM-dd"),
-                Genres = movie.Genres.Select(g => g.Name).ToList(),
+                Genres = movie.Genres!.Select(g => g.Name).ToList(),
                 Runtime = movie.Runtime,
                 Tagline = movie.Tagline,
                 Rating = movie.VoteAverage,
                 Language = movie.OriginalLanguage,
                 ImdbId = movie.ImdbId ?? "",
-                Cast = credits?.Cast.Take(5).Select(c => c.Name).ToList()
+                Cast = credits?.Cast!.Take(5).Select(c => c.Name).ToList()
             };
 
             return JsonSerializer.Serialize(movieData, new JsonSerializerOptions
@@ -540,14 +540,14 @@ public class TheMovieDBTool
             var searchResults = await query.Query();
             List<MovieSearchResult> movieList = new List<MovieSearchResult>();
 
-            foreach (var movie in searchResults.Results)
+            foreach (var movie in searchResults!.Results!)
             {
                 var externalIds = await client.GetMovieExternalIdsAsync(movie.Id);
                 movieList.Add(new MovieSearchResult(
                     movie.Id.ToString(),
-                    movie.Title,
+                    movie.Title!,
                     movie.ReleaseDate?.ToString("yyyy-MM-dd") ?? "",
-                    externalIds.ImdbId ?? ""
+                    externalIds!.ImdbId ?? ""
                 ));
             }
 
