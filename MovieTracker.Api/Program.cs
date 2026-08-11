@@ -6,6 +6,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using MovieTracker.Api.Core;
 using MovieTracker.Api.Tools;
+using OpenAI.Chat;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -16,18 +17,16 @@ string deploymentName = config["DeploymentName"]!;
 
 AIAgent movieAgent = new AzureOpenAIClient(endpoint, apiKey)
     .GetChatClient(deploymentName)
-    .AsIChatClient()
-    .CreateAIAgent(
+    .AsAIAgent(
         instructions: "You are a helpful assistant in movie tracking.",
         name: "Movie Assistant");
 
 AIAgent dateTimeAgent = new AzureOpenAIClient(endpoint, apiKey)
     .GetChatClient(deploymentName)
-    .AsIChatClient()
-    .CreateAIAgent(
+    .AsAIAgent(
         instructions: "You answer questions about the date or time.",
         name: "DateTime Agent",
-        description: "An agent that answers date time, peroid, moment, and duration.",
+        description: "An agent that answers date time, period, moment, and duration.",
         tools: [
             AIFunctionFactory.Create((Func<string>)DateTimeTool.Today),
             AIFunctionFactory.Create((Func<string>)DateTimeTool.ThisMonth),
@@ -48,8 +47,7 @@ builder.Services.AddSingleton<AIAgent>(sp =>
 
     return new AzureOpenAIClient(endpoint, apiKey)
         .GetChatClient(deploymentName)
-        .AsIChatClient()
-        .CreateAIAgent(
+        .AsAIAgent(
             instructions: "You are a movie data assistant that answers using live TMDb data.",
             name: "TheMovieDb Agent",
             description: "Provides movie details, search, trailers, genres, keywords, and discovery via TMDb.",
@@ -86,12 +84,10 @@ if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Container
 app.MapControllers();
 
 app.MapGet("/health", () => Results.Ok("healthy"))
-    .WithName("Health")
-    .WithOpenApi();
+    .WithName("Health");
 
 app.MapGet("/health/ready", () => Results.Ok("ready"))
-    .WithName("Ready")
-    .WithOpenApi();
+    .WithName("Ready");
 
 app.MapGet("/version", () =>
 {

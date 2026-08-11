@@ -28,7 +28,7 @@ public class AskController : ControllerBase
 
         try
         {
-            AgentRunResponse response = await agent.RunAsync(request.Question);
+            AgentResponse response = await agent.RunAsync(request.Question);
             return Ok(new AskResponseDot { Answer = response.ToString() });
         }
         catch (OperationCanceledException)
