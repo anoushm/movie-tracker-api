@@ -427,7 +427,7 @@ public class TheMovieDBTool
                 Rating = movie.VoteAverage,
                 Language = movie.OriginalLanguage,
                 ImdbId = movie.ImdbId ?? "",
-                Cast = credits?.Cast!.Take(5).Select(c => c.Name).ToList()
+                Cast = credits?.Cast?.Take(5).Select(c => c.Name).ToList()
             };
 
             return JsonSerializer.Serialize(movieData, new JsonSerializerOptions

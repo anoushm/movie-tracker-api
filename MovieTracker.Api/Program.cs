@@ -26,7 +26,7 @@ AIAgent dateTimeAgent = new AzureOpenAIClient(endpoint, apiKey)
     .AsAIAgent(
         instructions: "You answer questions about the date or time.",
         name: "DateTime Agent",
-        description: "An agent that answers date time, peroid, moment, and duration.",
+        description: "An agent that answers date time, period, moment, and duration.",
         tools: [
             AIFunctionFactory.Create((Func<string>)DateTimeTool.Today),
             AIFunctionFactory.Create((Func<string>)DateTimeTool.ThisMonth),
