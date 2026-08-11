@@ -11,9 +11,9 @@ using OpenAI.Chat;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 IConfigurationSection config = builder.Configuration.GetSection("AzureOpenAI");
-Uri endpoint = new Uri(config["Endpoint"]!);
-AzureKeyCredential apiKey = new AzureKeyCredential(config["ApiKey"]!);
-string deploymentName = config["DeploymentName"]!;
+Uri endpoint = new Uri(config["Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:Endpoint"));
+AzureKeyCredential apiKey = new AzureKeyCredential(config["ApiKey"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:ApiKey"));
+string deploymentName = config["DeploymentName"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:DeploymentName");
 
 AIAgent movieAgent = new AzureOpenAIClient(endpoint, apiKey)
     .GetChatClient(deploymentName)
