@@ -26,3 +26,15 @@ MovieTracker.Api/appsettings.Development.json
 **/appsettings.Development.json
 **/launchSettings.json
 /MovieTracker.Api/Properties/launchSettings.json
+
+/.claude
+/.specify
+
+# Scratch
+_to_delete/
+
+# Test output
+TestResults/
+
+# JetBrains Rider
+.idea/
