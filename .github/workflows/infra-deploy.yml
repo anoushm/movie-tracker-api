@@ -122,6 +122,11 @@ jobs:
             --location ${{ env.AZURE_LOCATION }} \
             --tags domain=movie-tracker env=${{ github.event.inputs.environment || 'demo' }}
 
+      - name: Register Cosmos DB resource provider
+        run: |
+          az provider register --namespace Microsoft.DocumentDB --wait
+          az provider show -n Microsoft.DocumentDB --query registrationState -o tsv
+
       - name: Read Current Container App Image Into Environment
         run: |
           CURRENT_IMAGE=$(az containerapp show \
