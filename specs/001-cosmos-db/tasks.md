@@ -80,7 +80,7 @@ complete.
     - `{ name: 'AZURE_CLIENT_ID', value: managedIdentityClientId }`
 
 - [ ] T004 [P] Modify `infrastructure/demo.parameters.json`:
-  - Add a new parameter block: `"cosmosAccountName": { "value": "movie-tracker-cosmos-demo" }`. Value is globally unique across Azure; if the demo deployment later collides, the fix is a one-line change to this value.
+  - Add a new parameter block: `"cosmosAccountName": { "value": "movie-tracker-cosmos" }`. Value is globally unique across Azure; if the demo deployment later collides, the fix is a one-line change to this value.
 
 - [ ] T004a Validate Bicep compiles: `bicep build infrastructure/main.bicep` returns exit 0 with no errors and no warnings other than pre-existing ones. Do this before attempting any Azure deployment — a syntax or reference error caught here is seconds; caught in `az deployment group create` is minutes plus a partial rollout to unwind.
 
@@ -187,12 +187,12 @@ and issuing a local `curl` against `/health/cosmos` returns 200 naming the same 
 as the deployed app.
 
 - [ ] T010 [US2] Modify `README.md` — add a new "Cosmos DB local development" section satisfying FR-013:
-  - Names the deployed resource: Cosmos account `movie-tracker-cosmos-demo` in resource group `RG-MovieTracker-Demo`, region `westus3`.
+  - Names the deployed resource: Cosmos account `movie-tracker-cosmos` in resource group `RG-MovieTracker-Demo`, region `westus3`.
   - Documents the three configuration keys — `Cosmos:Endpoint`, `Cosmos:Database`, `Cosmos:Container` — with expected literal values (`database`, `chat-sessions`) and notes that `Cosmos:Endpoint` must be set locally via user-secrets or environment variable (`Cosmos__Endpoint`).
   - Documents that `AZURE_CLIENT_ID` must be UNSET locally so `DefaultAzureCredential` falls back to `AzureCliCredential` (otherwise it tries to authenticate as the deployed UAMI and fails).
   - Includes the one-time per-developer role-grant command using the built-in Cosmos DB Data Contributor role (`00000000-0000-0000-0000-000000000002`). Give it as a PowerShell-safe single line (this repo is Windows/PowerShell; bash `\` line-continuations do not run in `pwsh`):
     ```powershell
-    az cosmosdb sql role assignment create --account-name movie-tracker-cosmos-demo --resource-group RG-MovieTracker-Demo --scope "/" --principal-id (az ad signed-in-user show --query id -o tsv) --role-definition-id 00000000-0000-0000-0000-000000000002
+    az cosmosdb sql role assignment create --account-name movie-tracker-cosmos --resource-group RG-MovieTracker-Demo --scope "/" --principal-id (az ad signed-in-user show --query id -o tsv) --role-definition-id 00000000-0000-0000-0000-000000000002
     ```
   - States the verification recipe: `az login`, then `dotnet run --project MovieTracker.Api/MovieTracker.Api.csproj`, then `curl` `/health/cosmos` on the port shown in the console — expect 200 with the deployed account host in the body.
 
@@ -206,7 +206,7 @@ green local probe (SC-004).
 - [ ] T011 Modify `CLAUDE.md`:
   - Under "Key Endpoints" add: `GET /health/cosmos - Cosmos DB connectivity probe (real read round trip via managed identity)`.
   - Under "Development Notes" add a bullet naming the three new configuration keys (`Cosmos:Endpoint`, `Cosmos:Database`, `Cosmos:Container`) and their env-var equivalents (`Cosmos__Endpoint`, `Cosmos__Database`, `Cosmos__Container`), and noting that `AZURE_CLIENT_ID` is set in the Container App to select the user-assigned MI for `DefaultAzureCredential`.
-  - Under "Azure Resources" add: `Cosmos DB Account: movie-tracker-cosmos-demo (serverless, NoSQL vector search, westus3)`.
+  - Under "Azure Resources" add: `Cosmos DB Account: movie-tracker-cosmos (serverless, NoSQL vector search, westus3)`.
   - If the existing "Region: West US 2" line is present, update it to `westus3` to match the new deployment target.
 
 ---

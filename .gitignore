@@ -38,3 +38,6 @@ TestResults/
 
 # JetBrains Rider
 .idea/
+
+# Compiled ARM output
+infrastructure/main.json

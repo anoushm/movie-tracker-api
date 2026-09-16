@@ -47,6 +47,9 @@ param minReplicas int = 0
 @description('Maximum number of replicas')
 param maxReplicas int = 5
 
+@description('Cosmos DB account name (globally unique)')
+param cosmosAccountName string
+
 var commonTags = {
   domain: 'movie-tracker'
   env: environmentType
@@ -62,6 +65,15 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   name: '${containerAppName}-identity'
   location: location
   tags: commonTags
+}
+
+module cosmos 'cosmos.bicep' = {
+  name: 'cosmos-deployment'
+  params: {
+    location: location
+    accountName: cosmosAccountName
+    principalId: managedIdentity.properties.principalId
+  }
 }
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -193,6 +205,9 @@ module containerAppModule 'container-app.bicep' = {
     managedIdentityId: managedIdentity.id
     managedIdentityClientId: managedIdentity.properties.clientId
     commonTags: commonTags
+    cosmosEndpoint: cosmos.outputs.endpoint
+    cosmosDatabase: cosmos.outputs.databaseName
+    cosmosContainer: cosmos.outputs.containerName
   }
   dependsOn: [
     kvSecretsUserRole
@@ -223,3 +238,6 @@ output keyVaultName string = keyVault.outputs.keyVaultName
 output keyVaultId string = keyVault.outputs.keyVaultId
 output managedIdentityId string = managedIdentity.id
 output managedIdentityPrincipalId string = managedIdentity.properties.principalId
+output cosmosAccountName string = cosmos.outputs.accountName
+output cosmosEndpoint string = cosmos.outputs.endpoint
+output cosmosDatabaseName string = cosmos.outputs.databaseName

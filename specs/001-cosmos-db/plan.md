@@ -224,7 +224,7 @@ convention (see `container-app.bicep` lines 47–54):
 
 | Key (config path) | Env var name | Source | Example value |
 |---|---|---|---|
-| `Cosmos:Endpoint` | `Cosmos__Endpoint` | `cosmos.bicep` output → `main.bicep` → `container-app.bicep` envVars | `https://movie-tracker-cosmos-demo.documents.azure.com:443/` |
+| `Cosmos:Endpoint` | `Cosmos__Endpoint` | `cosmos.bicep` output → `main.bicep` → `container-app.bicep` envVars | `https://movie-tracker-cosmos.documents.azure.com:443/` |
 | `Cosmos:Database` | `Cosmos__Database` | plain literal in `container-app.bicep` | `database` |
 | `Cosmos:Container` | `Cosmos__Container` | plain literal in `container-app.bicep` | `chat-sessions` |
 
@@ -363,7 +363,7 @@ initial 503s during Cosmos role-assignment propagation — see spec Edge Case 2)
 - Local role grant (one-shot, per developer):
   ```text
   az cosmosdb sql role assignment create \
-    --account-name movie-tracker-cosmos-demo \
+    --account-name movie-tracker-cosmos \
     --resource-group RG-MovieTracker-Demo \
     --scope "/" \
     --principal-id <developer object id from `az ad signed-in-user show`> \

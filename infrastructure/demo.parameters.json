@@ -46,6 +46,9 @@
     },
     "userPrincipalId": {
       "value": "97233733-6001-4f55-a035-54dba75c7d7a"
+    },
+    "cosmosAccountName": {
+      "value": "movie-tracker-cosmos"
     }
   }
 }

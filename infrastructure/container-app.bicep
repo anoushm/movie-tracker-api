@@ -15,6 +15,9 @@ param keyVaultName string
 param managedIdentityId string
 param managedIdentityClientId string
 param commonTags object
+param cosmosEndpoint string
+param cosmosDatabase string
+param cosmosContainer string
 
 var keyVaultUri = 'https://${keyVaultName}${environment().suffixes.keyvaultDns}/secrets'
 
@@ -51,6 +54,22 @@ var envVars = [
   {
     name: 'TheMovieDb__Api-Key'
     secretRef: 'themoviedb-api-key'
+  }
+  {
+    name: 'Cosmos__Endpoint'
+    value: cosmosEndpoint
+  }
+  {
+    name: 'Cosmos__Database'
+    value: cosmosDatabase
+  }
+  {
+    name: 'Cosmos__Container'
+    value: cosmosContainer
+  }
+  {
+    name: 'AZURE_CLIENT_ID'
+    value: managedIdentityClientId
   }
 ]
 
