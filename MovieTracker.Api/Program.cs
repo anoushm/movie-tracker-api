@@ -1,8 +1,11 @@
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 using Azure;
 using Azure.AI.OpenAI;
+using Azure.Identity;
 using Microsoft.Agents.AI;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.AI;
 using MovieTracker.Api.Core;
 using MovieTracker.Api.Tools;
@@ -66,6 +69,12 @@ builder.Services.AddSingleton<AIAgent>(sp =>
             ]);
 });
 
+string cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Endpoint");
+string cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Database");
+string cosmosContainer = builder.Configuration["Cosmos:Container"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Container");
+
+builder.Services.AddSingleton(sp => new CosmosClient(cosmosEndpoint, new DefaultAzureCredential(), new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -88,6 +97,48 @@ app.MapGet("/health", () => Results.Ok("healthy"))
 
 app.MapGet("/health/ready", () => Results.Ok("ready"))
     .WithName("Ready");
+
+app.MapGet("/health/cosmos", async (CosmosClient cosmosClient, IConfiguration configuration) =>
+{
+    string database = configuration["Cosmos:Database"]!;
+    string container = configuration["Cosmos:Container"]!;
+    string account = new Uri(configuration["Cosmos:Endpoint"]!).Host;
+
+    using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+
+    try
+    {
+        Container cosmosContainerClient = cosmosClient.GetContainer(database, container);
+        await cosmosContainerClient.ReadContainerAsync(cancellationToken: cts.Token);
+        return Results.Ok(new { status = "ok", account, database, container });
+    }
+    catch (CosmosException ex)
+    {
+        string reason = ex.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "authorization",
+            HttpStatusCode.NotFound => "not-found",
+            _ => "unavailable"
+        };
+        object body = reason == "authorization"
+            ? new { status = "fail", reason, account, database, container, requiredRole = "Cosmos DB Built-in Data Contributor" }
+            : (object)new { status = "fail", reason, account, database, container };
+        return Results.Json(body, statusCode: 503);
+    }
+    catch (AuthenticationFailedException)
+    {
+        return Results.Json(
+            new { status = "fail", reason = "authorization", account, database, container, requiredRole = "Cosmos DB Built-in Data Contributor" },
+            statusCode: 503);
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.Json(
+            new { status = "fail", reason = "timeout", account, database, container },
+            statusCode: 503);
+    }
+})
+    .WithName("CosmosHealth");
 
 app.MapGet("/version", () =>
 {
