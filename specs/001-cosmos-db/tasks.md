@@ -94,10 +94,11 @@ complete.
 registration in Phase 4 will depend on, and wire the non-secret config keys.
 
 - [ ] T005 [P] Modify `MovieTracker.Api/MovieTracker.Api.csproj`:
-  - Add three `<PackageReference>` entries to the existing `<ItemGroup>`:
+  - Add four `<PackageReference>` entries to the existing `<ItemGroup>`:
     - `<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.62.0" />` (matches the Function App at `C:\projects\dev\movie-tracker-backend\src\MovieTracker.Backend\MovieTracker.Backend.csproj` line 32).
     - `<PackageReference Include="Azure.Identity" Version="1.21.0" />` (matches the Function App line 21).
     - `<PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />` (matches the Function App line 39; explicit because the ported serializer's `AIJsonUtilities.DefaultOptions` is a direct compile-time dependency and must not be left to transitive resolution through `Microsoft.Agents.AI 1.17.0`).
+    - `<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />` (Microsoft.Azure.Cosmos 3.62.0 hard-fails in its own targets file without an explicit Newtonsoft.Json reference, regardless of which serializer is in use; 13.0.4 matches the Function App. Do NOT use the `AzureCosmosDisableNewtonsoftJsonCheck` bypass).
 
 - [ ] T006 [P] Create `MovieTracker.Api/Core/CosmosSystemTextJsonSerializer.cs`:
   - Copy from `C:\projects\dev\movie-tracker-backend\src\MovieTracker.Backend\CosmosSystemTextJsonSerializer.cs`.

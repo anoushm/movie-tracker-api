@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.17.0" />
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.62.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
     <PackageReference Include="TMDbLib" Version="3.0.0" />
   </ItemGroup>
