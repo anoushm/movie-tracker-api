@@ -57,7 +57,7 @@ in this phase blocks the endpoint work in Phase 4.
 Program.cs foundational wiring in the first half of Phase 4-precursor (T008) are
 complete.
 
-- [ ] T001 Create `infrastructure/cosmos.bicep` with all of the following, verbatim values:
+- [x] T001 Create `infrastructure/cosmos.bicep` with all of the following, verbatim values:
   - Params: `location string = resourceGroup().location`, `accountName string`, `principalId string`.
   - Resource `Microsoft.DocumentDB/databaseAccounts@2024-05-15` named `accountName`, `kind: 'GlobalDocumentDB'`, no `identity` block, `properties`: `databaseAccountOfferType: 'Standard'`, `minimalTlsVersion: 'Tls12'`, `enableFreeTier: false`, **`disableLocalAuth: true`** (Principle I: managed identity is the sole auth mechanism; keys still exist in ARM but are non-functional for data-plane authentication), `capabilities: [ { name: 'EnableServerless' } { name: 'EnableNoSQLVectorSearch' } ]`, `capacity: { totalThroughputLimit: 4000 }`, single-region `locations: [ { locationName: location, failoverPriority: 0, isZoneRedundant: false } ]`, `isVirtualNetworkFilterEnabled: false`, `virtualNetworkRules: []`, `ipRules: []`.
   - Child resource `Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15` named `database`, no `throughput` (serverless), `properties.resource.id: 'database'` (required by ARM schema; matches backend reference).
@@ -65,13 +65,13 @@ complete.
   - Child resource `Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15` named `guid(cosmosAccount.id, principalId, '00000000-0000-0000-0000-000000000002')`, `properties.roleDefinitionId: '${cosmosAccount.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'` (built-in **Cosmos DB Data Contributor**), `properties.principalId: principalId`, `properties.scope: cosmosAccount.id`.
   - Outputs: `accountName string = accountName`, `endpoint string = cosmosAccount.properties.documentEndpoint`, `databaseName string = 'database'`, `containerName string = 'chat-sessions'`.
 
-- [ ] T002 Modify `infrastructure/main.bicep`:
+- [x] T002 Modify `infrastructure/main.bicep`:
   - Add `@description('Cosmos DB account name (globally unique)') param cosmosAccountName string` alongside the existing params.
   - After the existing `managedIdentity` resource (line 61), instantiate a new `module cosmos 'cosmos.bicep'` passing `location: location`, `accountName: cosmosAccountName`, `principalId: managedIdentity.properties.principalId`.
   - Extend the existing `containerAppModule` `params` block to pass `cosmosEndpoint: cosmos.outputs.endpoint`, `cosmosDatabase: cosmos.outputs.databaseName`, `cosmosContainer: cosmos.outputs.containerName`. (Passing `cosmos.outputs.*` creates an implicit dependency on the cosmos module — no explicit `dependsOn` needed.)
   - Add three outputs at the end: `output cosmosAccountName string = cosmos.outputs.accountName`, `output cosmosEndpoint string = cosmos.outputs.endpoint`, `output cosmosDatabaseName string = cosmos.outputs.databaseName`.
 
-- [ ] T003 [P] Modify `infrastructure/container-app.bicep`:
+- [x] T003 [P] Modify `infrastructure/container-app.bicep`:
   - Add three params: `param cosmosEndpoint string`, `param cosmosDatabase string`, `param cosmosContainer string`.
   - Append four entries to the existing `envVars` array — ALL plain values, NO `secretRef`, NO new entries in `secrets`:
     - `{ name: 'Cosmos__Endpoint', value: cosmosEndpoint }`
@@ -79,10 +79,10 @@ complete.
     - `{ name: 'Cosmos__Container', value: cosmosContainer }`
     - `{ name: 'AZURE_CLIENT_ID', value: managedIdentityClientId }`
 
-- [ ] T004 [P] Modify `infrastructure/demo.parameters.json`:
+- [x] T004 [P] Modify `infrastructure/demo.parameters.json`:
   - Add a new parameter block: `"cosmosAccountName": { "value": "movie-tracker-cosmos" }`. Value is globally unique across Azure; if the demo deployment later collides, the fix is a one-line change to this value.
 
-- [ ] T004a Validate Bicep compiles: `bicep build infrastructure/main.bicep` returns exit 0 with no errors and no warnings other than pre-existing ones. Do this before attempting any Azure deployment — a syntax or reference error caught here is seconds; caught in `az deployment group create` is minutes plus a partial rollout to unwind.
+- [x] T004a Validate Bicep compiles: `bicep build infrastructure/main.bicep` returns exit 0 with no errors and no warnings other than pre-existing ones. Do this before attempting any Azure deployment — a syntax or reference error caught here is seconds; caught in `az deployment group create` is minutes plus a partial rollout to unwind.
 
 **Checkpoint**: after T001–T004a, `az deployment group create` against `RG-MovieTracker-Demo` provisions the Cosmos account, `database`, `chat-sessions`, and the data-plane role assignment on the existing UAMI. The Container App gets `Cosmos__*` and `AZURE_CLIENT_ID` env vars but no code yet consumes them.
 
@@ -93,14 +93,14 @@ complete.
 **Purpose**: introduce the SDK, credential, and serializer that the Cosmos client
 registration in Phase 4 will depend on, and wire the non-secret config keys.
 
-- [ ] T005 [P] Modify `MovieTracker.Api/MovieTracker.Api.csproj`:
+- [x] T005 [P] Modify `MovieTracker.Api/MovieTracker.Api.csproj`:
   - Add four `<PackageReference>` entries to the existing `<ItemGroup>`:
     - `<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.62.0" />` (matches the Function App at `C:\projects\dev\movie-tracker-backend\src\MovieTracker.Backend\MovieTracker.Backend.csproj` line 32).
     - `<PackageReference Include="Azure.Identity" Version="1.21.0" />` (matches the Function App line 21).
     - `<PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />` (matches the Function App line 39; explicit because the ported serializer's `AIJsonUtilities.DefaultOptions` is a direct compile-time dependency and must not be left to transitive resolution through `Microsoft.Agents.AI 1.17.0`).
     - `<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />` (Microsoft.Azure.Cosmos 3.62.0 hard-fails in its own targets file without an explicit Newtonsoft.Json reference, regardless of which serializer is in use; 13.0.4 matches the Function App. Do NOT use the `AzureCosmosDisableNewtonsoftJsonCheck` bypass).
 
-- [ ] T006 [P] Create `MovieTracker.Api/Core/CosmosSystemTextJsonSerializer.cs`:
+- [x] T006 [P] Create `MovieTracker.Api/Core/CosmosSystemTextJsonSerializer.cs`:
   - Copy from `C:\projects\dev\movie-tracker-backend\src\MovieTracker.Backend\CosmosSystemTextJsonSerializer.cs`.
   - Change `namespace MovieTracker.Backend` to `namespace MovieTracker.Api.Core`.
   - Prune the unused `System.Collections.Generic`, `System.Linq`, `System.Text`, `System.Threading.Tasks` usings.
@@ -108,7 +108,7 @@ registration in Phase 4 will depend on, and wire the non-secret config keys.
   - Preserve `PropertyNamingPolicy = null` and the combined `AIJsonUtilities.DefaultOptions.TypeInfoResolver` + `DefaultJsonTypeInfoResolver` resolver — those are behavior, not documentation.
   - Do NOT modernize (no primary constructor, no record, no expression-bodied override rewrites) — the diff stays auditable against the source file.
 
-- [ ] T007 [P] Modify `MovieTracker.Api/appsettings.json`:
+- [x] T007 [P] Modify `MovieTracker.Api/appsettings.json`:
   - Add a top-level `"Cosmos"` object with the two non-secret literal keys ONLY:
     - `"Database": "database"`
     - `"Container": "chat-sessions"`
@@ -126,7 +126,7 @@ resolves, and the three `Cosmos:*` config keys are readable from
 that the endpoint in Phase 5 will consume. Kept as its own phase so the endpoint task
 lands strictly last as the user required.
 
-- [ ] T008 Modify `MovieTracker.Api/Program.cs` — insert the following BEFORE `WebApplication app = builder.Build();`, using the same "read → `?? throw new InvalidOperationException(...)`" pattern already present at Program.cs line 14 for `AzureOpenAI:Endpoint`:
+- [x] T008 Modify `MovieTracker.Api/Program.cs` — insert the following BEFORE `WebApplication app = builder.Build();`, using the same "read → `?? throw new InvalidOperationException(...)`" pattern already present at Program.cs line 14 for `AzureOpenAI:Endpoint`:
   - Add usings at the top of the file: `using Azure.Identity;`, `using Microsoft.Azure.Cosmos;`, `using MovieTracker.Api.Core;`.
   - Read three config values:
     - `string cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Endpoint");`
@@ -136,7 +136,7 @@ lands strictly last as the user required.
     - `builder.Services.AddSingleton(sp => new CosmosClient(cosmosEndpoint, new DefaultAzureCredential(), new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));`
   - Do NOT set `CosmosClientOptions.RequestTimeout` here; the per-request 10 s bound lives at the probe call site in T009 so a later slice reconfiguring the shared client cannot regress FR-007 / SC-006.
 
-- [ ] T008a Validate the project compiles: `dotnet build MovieTracker.Api/MovieTracker.Api.csproj` returns exit 0. This catches missing `using` directives (e.g. `System.Net` for T009, `Azure.Identity` for T008), missing package references (T005), and namespace mismatches on the ported serializer (T006) before the endpoint task adds more surface area.
+- [x] T008a Validate the project compiles: `dotnet build MovieTracker.Api/MovieTracker.Api.csproj` returns exit 0. This catches missing `using` directives (e.g. `System.Net` for T009, `Azure.Identity` for T008), missing package references (T005), and namespace mismatches on the ported serializer (T006) before the endpoint task adds more surface area.
 
 **Checkpoint**: after T008–T008a the app compiles and fails to start unless all three `Cosmos:*` keys are present. When they are, a `CosmosClient` singleton resolves from DI, but no endpoint uses it yet — `/health`, `/health/ready`, `/version` all still respond as before.
 
@@ -154,7 +154,7 @@ literals `database` and `chat-sessions`. A 503 with `reason: "authorization"` du
 the first minute after a fresh deploy is expected role-assignment propagation (spec
 Edge Case 2, SC-001) and is cleared by retry.
 
-- [ ] T009 [US1] Modify `MovieTracker.Api/Program.cs` — map `GET /health/cosmos` AFTER the existing `app.MapGet("/health/ready", …)` (Program.cs line 89) and before `app.MapGet("/version", …)` (line 92). Do NOT modify `/health` or `/health/ready` handlers (FR-008, SC-005).
+- [x] T009 [US1] Modify `MovieTracker.Api/Program.cs` — map `GET /health/cosmos` AFTER the existing `app.MapGet("/health/ready", …)` (Program.cs line 89) and before `app.MapGet("/version", …)` (line 92). Do NOT modify `/health` or `/health/ready` handlers (FR-008, SC-005).
   - Add usings at the top of `Program.cs`: `using System.Net;` (for `HttpStatusCode` — omitting this is a compile break) and `using Azure.Identity;` (already added in T008 for `DefaultAzureCredential`; `AuthenticationFailedException` lives in `Azure.Identity` too).
   - Handler signature receives `(CosmosClient cosmosClient, IConfiguration configuration)` from DI.
   - Timeout: `using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));`
@@ -187,7 +187,7 @@ role grant applied, running `dotnet run --project MovieTracker.Api/MovieTracker.
 and issuing a local `curl` against `/health/cosmos` returns 200 naming the same account
 as the deployed app.
 
-- [ ] T010 [US2] Modify `README.md` — add a new "Cosmos DB local development" section satisfying FR-013:
+- [x] T010 [US2] Modify `README.md` — add a new "Cosmos DB local development" section satisfying FR-013:
   - Names the deployed resource: Cosmos account `movie-tracker-cosmos` in resource group `RG-MovieTracker-Demo`, region `westus3`.
   - Documents the three configuration keys — `Cosmos:Endpoint`, `Cosmos:Database`, `Cosmos:Container` — with expected literal values (`database`, `chat-sessions`) and notes that `Cosmos:Endpoint` must be set locally via user-secrets or environment variable (`Cosmos__Endpoint`).
   - Documents that `AZURE_CLIENT_ID` must be UNSET locally so `DefaultAzureCredential` falls back to `AzureCliCredential` (otherwise it tries to authenticate as the deployed UAMI and fails).
@@ -204,7 +204,7 @@ green local probe (SC-004).
 
 ## Phase 7: Polish
 
-- [ ] T011 Modify `CLAUDE.md`:
+- [x] T011 Modify `CLAUDE.md`:
   - Under "Key Endpoints" add: `GET /health/cosmos - Cosmos DB connectivity probe (real read round trip via managed identity)`.
   - Under "Development Notes" add a bullet naming the three new configuration keys (`Cosmos:Endpoint`, `Cosmos:Database`, `Cosmos:Container`) and their env-var equivalents (`Cosmos__Endpoint`, `Cosmos__Database`, `Cosmos__Container`), and noting that `AZURE_CLIENT_ID` is set in the Container App to select the user-assigned MI for `DefaultAzureCredential`.
   - Under "Azure Resources" add: `Cosmos DB Account: movie-tracker-cosmos (serverless, NoSQL vector search, westus3)`.

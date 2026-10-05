@@ -50,6 +50,7 @@ infrastructure/             # Azure Bicep IaC templates
 
 - `GET /health` - Health check endpoint
 - `GET /health/ready` - Readiness probe endpoint
+- `GET /health/cosmos` - Cosmos DB connectivity probe (real read round trip via managed identity)
 - `GET /openapi/v1.json` - OpenAPI spec (Development only)
 
 ## Azure Resources
@@ -57,7 +58,8 @@ infrastructure/             # Azure Bicep IaC templates
 - **Resource Group**: `RG-MovieTracker-Demo`
 - **Container Registry**: `movietracker.azurecr.io`
 - **Container App**: `movie-tracker-api`
-- **Region**: West US 2
+- **Cosmos DB Account**: `movie-tracker-cosmos` (serverless, NoSQL vector search, westus3)
+- **Region**: westus3
 
 ## Development Notes
 
@@ -65,3 +67,5 @@ infrastructure/             # Azure Bicep IaC templates
 - HTTPS redirection is only enabled in Development
 - Container exposes ports 8080 (HTTP) and 8081
 - Uses system-assigned managed identity for Azure service access
+- Cosmos configuration keys: `Cosmos:Endpoint`, `Cosmos:Database`, `Cosmos:Container` (env-var equivalents `Cosmos__Endpoint`, `Cosmos__Database`, `Cosmos__Container`). Startup fails fast if any is missing.
+- `AZURE_CLIENT_ID` is set in the Container App to select the user-assigned managed identity for `DefaultAzureCredential`. Locally it must be UNSET so the credential chain falls back to `AzureCliCredential` — see README "Cosmos DB Local Development".

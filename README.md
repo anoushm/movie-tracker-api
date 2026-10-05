@@ -101,6 +101,76 @@ dotnet user-secrets set "AzureOpenAI:ApiKey" "<your-key>"
 dotnet user-secrets set "TheMovieDb:Api-Key" "<your-key>"
 ```
 
+## Cosmos DB Local Development
+
+The API talks to the deployed Cosmos account from your laptop over the public endpoint, authenticating as *you* via `az login`. No connection string is ever used; local and deployed runs read from the same account.
+
+### Deployed account
+
+- Account: `movie-tracker-cosmos`
+- Resource group: `RG-MovieTracker-Demo`
+- Region: `westus3`
+- Database: `database`
+- Container: `chat-sessions`
+
+### Configuration keys
+
+The API reads three non-secret keys:
+
+| Key | Local value | Where it comes from in Azure |
+|-----|-------------|------------------------------|
+| `Cosmos:Endpoint` | `https://movie-tracker-cosmos.documents.azure.com:443/` | `Cosmos__Endpoint` env var on the Container App |
+| `Cosmos:Database` | `database` | `appsettings.json` (also `Cosmos__Database` on the Container App) |
+| `Cosmos:Container` | `chat-sessions` | `appsettings.json` (also `Cosmos__Container` on the Container App) |
+
+Only `Cosmos:Endpoint` needs to be supplied locally — set it via user-secrets or an environment variable:
+
+```powershell
+cd MovieTracker.Api
+dotnet user-secrets set "Cosmos:Endpoint" "https://movie-tracker-cosmos.documents.azure.com:443/"
+```
+
+Or in the current shell:
+
+```powershell
+$env:Cosmos__Endpoint = "https://movie-tracker-cosmos.documents.azure.com:443/"
+```
+
+Startup fails fast if any of the three keys is missing.
+
+### `AZURE_CLIENT_ID` must be UNSET locally
+
+The Container App sets `AZURE_CLIENT_ID` so `DefaultAzureCredential` picks the user-assigned managed identity. Locally that same variable makes the credential chain try to authenticate as the UAMI from your laptop and fail. Make sure it is unset in whatever shell you run `dotnet run` from so the chain falls through to `AzureCliCredential`:
+
+```powershell
+Remove-Item Env:AZURE_CLIENT_ID -ErrorAction SilentlyContinue
+```
+
+### One-time data-plane role grant (per developer)
+
+The account has `disableLocalAuth: true`, so you need the built-in **Cosmos DB Built-in Data Contributor** role (`00000000-0000-0000-0000-000000000002`) on your own user principal before the probe will succeed. Run once:
+
+```powershell
+az cosmosdb sql role assignment create --account-name movie-tracker-cosmos --resource-group RG-MovieTracker-Demo --scope "/" --principal-id (az ad signed-in-user show --query id -o tsv) --role-definition-id 00000000-0000-0000-0000-000000000002
+```
+
+### Verify
+
+```powershell
+az login
+dotnet run --project MovieTracker.Api/MovieTracker.Api.csproj
+# then, from a second terminal, against the port shown in the console (e.g. 5000):
+curl http://localhost:5000/health/cosmos
+```
+
+Expected body:
+
+```json
+{"status":"ok","account":"movie-tracker-cosmos.documents.azure.com","database":"database","container":"chat-sessions"}
+```
+
+A 503 with `reason: "authorization"` immediately after granting the role is expected — Cosmos data-plane role propagation can take up to a minute. Retry.
+
 ## API Endpoints
 
 | Endpoint | Description |
@@ -108,6 +178,7 @@ dotnet user-secrets set "TheMovieDb:Api-Key" "<your-key>"
 | `POST /ask` | Ask the movie assistant a question |
 | `GET /health` | Liveness probe |
 | `GET /health/ready` | Readiness probe |
+| `GET /health/cosmos` | Cosmos DB connectivity probe (real read round trip via managed identity) |
 | `GET /version` | Build info and environment |
 
 ## Architecture
