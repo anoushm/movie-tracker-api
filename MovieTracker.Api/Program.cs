@@ -7,6 +7,7 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.AI;
+using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Core;
 using MovieTracker.Api.Tools;
 using OpenAI.Chat;
@@ -75,6 +76,8 @@ string cosmosContainer = builder.Configuration["Cosmos:Container"] ?? throw new 
 
 builder.Services.AddSingleton(sp => new CosmosClient(cosmosEndpoint, new DefaultAzureCredential(), new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));
 
+builder.Services.AddSingleton(sp => new ChatSessionRepository(sp.GetRequiredService<CosmosClient>(), cosmosDatabase, cosmosContainer));
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -139,6 +142,25 @@ app.MapGet("/health/cosmos", async (CosmosClient cosmosClient, IConfiguration co
     }
 })
     .WithName("CosmosHealth");
+
+app.MapGet("/api/chat/start", async (ChatSessionRepository repo, ILogger<Program> logger) =>
+{
+    try
+    {
+        List<Microsoft.Extensions.AI.ChatMessage> initialHistory = new List<Microsoft.Extensions.AI.ChatMessage>
+        {
+            new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.System, ChatStartSystemPrompt.Text)
+        };
+        MoviceTrackerChatSession session = await repo.NewChatSession(initialHistory);
+        return Results.Ok(new { chatId = session.id });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Chat-Start session creation failed.");
+        return Results.Json(new { error = "Session creation failed." }, statusCode: 503);
+    }
+})
+    .WithName("ChatStart");
 
 app.MapGet("/version", () =>
 {

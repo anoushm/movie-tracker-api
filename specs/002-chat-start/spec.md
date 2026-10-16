@@ -14,8 +14,8 @@
 
 A client application opens a new conversation by calling `GET /api/chat/start` and
 receives back an opaque session identifier. The identifier corresponds to a freshly
-created session document that already carries the movie-expert system prompt, so the
-first subsequent user turn can be answered without any further session setup.
+created session document that already carries the movie-expert system prompt as its
+only chat-history entry. Answering subsequent user turns is slice 003's concern.
 
 **Why this priority**: This is the entire slice. Without it there is no way to begin a
 conversation under the new API, and no later slice (`/ask`, hydration, telemetry) has
@@ -44,8 +44,9 @@ returns a document whose chat history contains the movie-expert system message.
    Cosmos.
 4. **Given** the Cosmos endpoint is reachable but the identity lacks write permission,
    **When** a caller requests `GET /api/chat/start`,
-   **Then** the response is a 5xx error and the response body does not contain
-   credentials, tokens, or connection strings.
+   **Then** the response is 503 with a generic error body, the server logs the
+   exception, and the body does not contain credentials, tokens, or connection
+   strings.
 
 ---
 
@@ -58,17 +59,16 @@ needing to encode it.
 URL positions where unencoded characters cause breakage. Preserving that id shape is
 cheap now and expensive to change later.
 
-**Independent Test**: A unit test on the generator asserts that produced characters
-fall in the allowed set across a sample run. A single `GET /api/chat/start` returns
-an identifier matching the same rule.
+**Independent Test**: Five sequential calls to `GET /api/chat/start` return 5
+distinct `chatId` values; each id contains only letters and digits, and each id
+point-reads a document in Cosmos.
 
 **Acceptance Scenarios**:
 
 1. **Given** a response from `GET /api/chat/start`,
    **When** the `chatId` is inspected,
-   **Then** every character is from the URL-unreserved set (letters, digits, or any
-   subset of `-._~` that excludes the characters previously rejected by the Function
-   App: `-` and `~`).
+   **Then** every character is a letter or digit (the generator rejects any
+   candidate containing `-` or `~`).
 
 ---
 
@@ -77,9 +77,9 @@ an identifier matching the same rule.
 - Cosmos configuration is missing when the application is already running (hot-swap of
   settings): behaviour is undefined; this feature inherits the fail-fast-at-startup
   guarantee from slice 001 and does not re-check configuration per request.
-- The Cosmos account exists but the configured container does not: the response is a
-  5xx error. Exact classification of the underlying Cosmos failure is not part of the
-  response contract.
+- The Cosmos account exists but the configured container does not: the response is
+  503 with a generic error body and the exception is logged. Classification of the
+  underlying Cosmos failure is not part of the response contract.
 - A random identifier is generated that happens to contain a disallowed character:
   the application retries the generation rather than returning a reserved character to
   the caller, matching the Function App's existing behaviour.
@@ -93,38 +93,41 @@ an identifier matching the same rule.
 ### Functional Requirements
 
 - **FR-001**: The system MUST expose `GET /api/chat/start` and respond with a JSON body
-  containing a single `chatId` string property. No other properties, headers, or
-  side-effects are part of the contract.
+  containing a single `chatId` string property. No other response properties or
+  response headers are part of the contract. Required side-effects are limited to
+  the session-document creation specified in FR-002 and the ambient logging already
+  present in the API.
 - **FR-002**: The system MUST, before responding, create a session document in Cosmos
   DB whose `id` and partition key both equal the returned `chatId`.
 - **FR-003**: The created document MUST contain a chat history populated with exactly
   one system message, whose text is the movie-expert system prompt reproduced
   verbatim from the Function App's `Chat-Start` implementation.
-- **FR-004**: The created document MUST preserve the Function App's document shape on
-  the properties exercised by this slice: an `id` string, a `PartitionKey` string, a
-  `ChatHistory` array of messages, a nullable `FunnyFact`, and a nullable
-  `HydratedMovies` map. Properties not exercised in this slice remain null or absent.
-- **FR-005**: The chat history message element MUST be serialized in a shape the
-  Agent Framework (`Microsoft.Extensions.AI.ChatMessage`) can round-trip. The Function
-  App's note that pre-migration documents cannot be loaded is accepted; forward
-  compatibility starts at this slice.
-- **FR-006**: The system MUST connect to Cosmos DB using the Container App's
-  user-assigned managed identity. No Cosmos account key, connection string, SAS, or
-  Key Vault secret may be introduced by this feature.
+- **FR-004**: The created document MUST preserve the Function App's property names
+  for the fields this slice writes: an `id` string, a `PartitionKey` string, and a
+  `ChatHistory` array containing the seeded system message. `FunnyFact` and
+  `HydratedMovies` are left null or absent; this slice does not import, define, or
+  constrain their value types.
+- **FR-005**: The chat-history message element MUST be serialized in a shape
+  compatible with `Microsoft.Extensions.AI.ChatMessage`. Reading the document back
+  is not part of this slice.
+- **FR-006**: In the deployed Container App the system MUST connect to Cosmos DB
+  using the user-assigned managed identity (local development continues to use the
+  `AzureCliCredential` fallback established by slice 001). No Cosmos account key,
+  connection string, SAS, or Key Vault secret may be introduced by this feature.
 - **FR-007**: The database name and container name used for the write MUST be read
   from the `Cosmos:Database` and `Cosmos:Container` configuration keys that slice 001
   already requires. Hard-coding either name in source is prohibited.
-- **FR-008**: The system MUST generate session identifiers that contain only
-  characters from the URL-unreserved set, and MUST exclude the characters already
-  rejected by the Function App's identifier generator (`-`, `~`). The generator MUST
-  retry when a candidate contains a rejected character.
-- **FR-009**: Identifiers MUST be generated from a cryptographically strong random
-  source, matching the Function App's generator (five random bytes, URL-safe
-  base64, retry on rejected characters). Collision handling beyond that is out of
-  scope: the source performs none and this slice does not add it.
-- **FR-010**: The endpoint MUST return a 5xx error if the Cosmos write fails, and
-  the response body MUST NOT include credentials, tokens, or connection strings.
-  No further structure of the error body is required by this slice.
+- **FR-008**: The system MUST generate session identifiers using the Function App's
+  `GenId` algorithm: 5 random bytes, standard base64 encoding, replace `/` with `~`
+  and `+` with `-`, strip `=`, retry if the result still contains `-` or `~`. The
+  returned id contains only letters and digits.
+- **FR-009**: The random source used by `GenId` MUST be cryptographically strong
+  (`System.Security.Cryptography.RandomNumberGenerator`). Collision handling beyond
+  retry-on-rejected-character is out of scope: the Function App performs none and
+  this slice does not add any.
+- **FR-010**: If the Cosmos write fails, the endpoint MUST return 503 with a
+  generic error body and MUST log the exception. The response body MUST NOT include
+  credentials, tokens, connection strings, or the exception's own message or stack.
 - **FR-011**: No existing endpoint behaviour MUST change as a result of this feature.
   In particular, `/health`, `/health/ready`, `/health/cosmos`, `/version`, and the
   current `/ask` endpoint must behave identically before and after this change.
@@ -157,7 +160,8 @@ an identifier matching the same rule.
   `id`, `PartitionKey`, `ChatHistory` (initially one system message), and reserved
   nullable slots for later slices.
 - **Session identifier (`chatId`)**: the single opaque string returned to the caller.
-  Equal to the document's `id` and its partition key. URL-safe and non-guessable.
+  Equal to the document's `id` and its partition key. Opaque, randomly generated,
+  URL-safe.
 - **Movie-expert system prompt**: the fixed text seeded as the first message of
   every new session. Reproduced from the Function App; not configurable in this
   slice.
@@ -169,17 +173,14 @@ an identifier matching the same rule.
 - **SC-001**: A caller can obtain a new session identifier against the deployed API
   with a single `GET` request and no prior setup, measured by a successful 200
   response at the public FQDN.
-- **SC-002**: A successful `GET /api/chat/start` leaves one new document in Cosmos
-  whose id equals the returned identifier, verified by a point-read in a small
-  integration smoke test.
+- **SC-002**: Five sequential calls to `GET /api/chat/start` each produce a document
+  in Cosmos, verified by point-read on the returned `chatId`.
 - **SC-003**: A search of this repository finds zero new Cosmos keys, connection
   strings, or SAS tokens introduced by this feature.
-- **SC-004**: `/health`, `/health/ready`, `/health/cosmos`, `/version`, and the
-  current `/ask` endpoint continue to return their existing successful responses,
-  verified by a focused smoke run after the change.
-- **SC-005**: A unit test on the id generator confirms produced characters fall in
-  the URL-unreserved set excluding `-` and `~`, matching the Function App's rule.
-- **SC-006**: A failing Cosmos write surfaces to the caller as a 5xx response.
+- **SC-004**: A manual check confirms `/health`, `/health/ready`, `/health/cosmos`,
+  `/version`, and `POST /ask` still respond as before.
+- **SC-005**: Five sequential calls to `GET /api/chat/start` return 5 distinct
+  `chatId` values, each containing only letters and digits.
 
 ## Assumptions
 
@@ -197,8 +198,9 @@ an identifier matching the same rule.
 - The Container App already sets `AZURE_CLIENT_ID` to select the user-assigned
   managed identity for `DefaultAzureCredential`, and the local development story
   established by slice 001's README continues to apply unchanged.
-- The id generator follows the Function App's scheme (five random bytes, URL-safe
-  base64, retry on `-`/`~`) rather than inventing a new encoding. Changing the
-  scheme is a separate decision, not part of this slice.
+- The id generator is the Function App's `GenId` copied as-is: 5 random bytes,
+  standard base64 with `/` → `~` and `+` → `-`, strip `=`, retry if the result
+  still contains `-` or `~`. Produces 7-character ids of letters and digits.
+  Changing the scheme is a separate decision, not part of this slice.
 - The existing `CosmosClient` registration from slice 001 is reused as the single
   shared client; no second client is introduced.
