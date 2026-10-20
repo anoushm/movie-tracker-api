@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -590,13 +591,25 @@ public class TheMovieDBKernelFunctions
 
         if (!string.IsNullOrEmpty(releaseDateFrom))
         {
-            DateTime releaseDate = DateTime.Parse(releaseDateFrom);
+            if (!DateTime.TryParseExact(releaseDateFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime releaseDate))
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    Error = $"Invalid releaseDateFrom '{releaseDateFrom}'. Expected format YYYY-MM-DD."
+                });
+            }
             query = query.WherePrimaryReleaseDateIsAfter(releaseDate);
         }
 
         if (!string.IsNullOrEmpty(releaseDateTo))
         {
-            DateTime releaseDate = DateTime.Parse(releaseDateTo);
+            if (!DateTime.TryParseExact(releaseDateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime releaseDate))
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    Error = $"Invalid releaseDateTo '{releaseDateTo}'. Expected format YYYY-MM-DD."
+                });
+            }
             query = query.WherePrimaryReleaseDateIsBefore(releaseDate);
         }
 

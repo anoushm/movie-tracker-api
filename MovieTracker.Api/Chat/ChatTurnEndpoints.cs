@@ -171,6 +171,11 @@ public static class ChatTurnEndpoints
     {
         try
         {
+            if (!request.HasJsonContentType())
+            {
+                return Results.BadRequest(new { error = "Invalid request, missing ask object" });
+            }
+
             Ask? ask;
             try
             {
@@ -231,6 +236,11 @@ public static class ChatTurnEndpoints
     {
         try
         {
+            if (!request.HasJsonContentType())
+            {
+                return Results.BadRequest(new { error = "Invalid request, missing ask object" });
+            }
+
             Ask? ask;
             try
             {
@@ -362,20 +372,35 @@ public static class ChatTurnEndpoints
         {
             using JsonDocument doc = JsonDocument.Parse(text);
             JsonElement root = doc.RootElement;
-            string? systemMessage = root.GetProperty("SystemMessage").GetString() ?? string.Empty;
 
-            if (root.TryGetProperty("MovieList", out JsonElement movieList))
+            if (root.ValueKind != JsonValueKind.Object)
             {
-                List<JsonElement> entries = movieList.EnumerateArray().ToList();
-                MovieViewModel?[] slots = new MovieViewModel?[entries.Count];
-
-                await Task.WhenAll(entries.Select((movie, index) =>
-                    SafeProcessMovieAsync(movie, slots, index, sessionCache, cache, tmdbClient, logger)));
-
-                movieItems = [.. slots.Where(slot => slot is not null).Select(slot => slot!)];
+                return new AssistantChatMessage("No movies were found", movieItems);
             }
 
-            return new AssistantChatMessage(systemMessage ?? string.Empty, movieItems);
+            if (!root.TryGetProperty("SystemMessage", out JsonElement systemMessageElement)
+                || systemMessageElement.ValueKind != JsonValueKind.String)
+            {
+                return new AssistantChatMessage("No movies were found", movieItems);
+            }
+
+            if (!root.TryGetProperty("MovieList", out JsonElement movieList)
+                || movieList.ValueKind != JsonValueKind.Array)
+            {
+                return new AssistantChatMessage("No movies were found", movieItems);
+            }
+
+            string systemMessage = systemMessageElement.GetString() ?? string.Empty;
+
+            List<JsonElement> entries = movieList.EnumerateArray().ToList();
+            MovieViewModel?[] slots = new MovieViewModel?[entries.Count];
+
+            await Task.WhenAll(entries.Select((movie, index) =>
+                SafeProcessMovieAsync(movie, slots, index, sessionCache, cache, tmdbClient, logger)));
+
+            movieItems = [.. slots.Where(slot => slot is not null).Select(slot => slot!)];
+
+            return new AssistantChatMessage(systemMessage, movieItems);
         }
         catch (JsonException)
         {
