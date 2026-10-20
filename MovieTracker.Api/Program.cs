@@ -1,3 +1,5 @@
+using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
@@ -7,72 +9,89 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Distributed;
+using MovieTracker.Api.Chat;
 using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Core;
-using MovieTracker.Api.Tools;
-using OpenAI.Chat;
+using MovieTracker.Api.Prompts;
+using TMDbLib.Client;
+using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 IConfigurationSection config = builder.Configuration.GetSection("AzureOpenAI");
 Uri endpoint = new Uri(config["Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:Endpoint"));
-AzureKeyCredential apiKey = new AzureKeyCredential(config["ApiKey"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:ApiKey"));
+string apiKey = config["ApiKey"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:ApiKey");
 string deploymentName = config["DeploymentName"] ?? throw new InvalidOperationException("Missing configuration value: AzureOpenAI:DeploymentName");
 
-AIAgent movieAgent = new AzureOpenAIClient(endpoint, apiKey)
-    .GetChatClient(deploymentName)
-    .AsAIAgent(
-        instructions: "You are a helpful assistant in movie tracking.",
-        name: "Movie Assistant");
-
-AIAgent dateTimeAgent = new AzureOpenAIClient(endpoint, apiKey)
-    .GetChatClient(deploymentName)
-    .AsAIAgent(
-        instructions: "You answer questions about the date or time.",
-        name: "DateTime Agent",
-        description: "An agent that answers date time, period, moment, and duration.",
-        tools: [
-            AIFunctionFactory.Create((Func<string>)DateTimeTool.Today),
-            AIFunctionFactory.Create((Func<string>)DateTimeTool.ThisMonth),
-            AIFunctionFactory.Create((Func<string>)DateTimeTool.ThisYear),
-            AIFunctionFactory.Create((Func<int, string>)DateTimeTool.PastYearsRange),
-            AIFunctionFactory.Create((Func<int, string>)DateTimeTool.PastMonthsRange),
-            AIFunctionFactory.Create((Func<int, string>)DateTimeTool.PastDaysRange),
-            AIFunctionFactory.Create((Func<string, int, string, string>)DateTimeTool.OffsetDate)
-        ]);
-
-builder.Services.AddSingleton(movieAgent);
-builder.Services.AddSingleton(dateTimeAgent);
-builder.Services.AddSingleton<TheMovieDBTool>();
-
-builder.Services.AddSingleton<AIAgent>(sp =>
-{
-    TheMovieDBTool theMovieDbTool = sp.GetRequiredService<TheMovieDBTool>();
-
-    return new AzureOpenAIClient(endpoint, apiKey)
-        .GetChatClient(deploymentName)
-        .AsAIAgent(
-            instructions: "You are a movie data assistant that answers using live TMDb data.",
-            name: "TheMovieDb Agent",
-            description: "Provides movie details, search, trailers, genres, keywords, and discovery via TMDb.",
-            tools: [
-                AIFunctionFactory.Create(() => theMovieDbTool.GetGenresList().UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string personName) => theMovieDbTool.SearchForPeople(personName).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string movieTitle, string? releaseYear) => theMovieDbTool.SearchMovies(movieTitle, releaseYear).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieTrailers(movieId).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieWithTrailer(movieId).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string userQuery) => theMovieDbTool.HandleGenericTrailerRequest(userQuery).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string movieId) => theMovieDbTool.GetMovieDetails(movieId).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string keyword) => theMovieDbTool.SearchKeywords(keyword).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string movieId) => theMovieDbTool.DescribeMovie(movieId).UnwrapForAgentAsync()),
-                AIFunctionFactory.Create((string? releaseDateFrom, string? releaseDateTo, string? castIds, string? genreIds, string? keywordIds, double? minVoteAverage, double? maxVoteAverage, int? minVoteCount, int? maxVoteCount) =>
-                    theMovieDbTool.DiscoverMovies(releaseDateFrom, releaseDateTo, castIds, genreIds, keywordIds, minVoteAverage, maxVoteAverage, minVoteCount, maxVoteCount).UnwrapForAgentAsync())
-            ]);
-});
+string tmdbApiKey = builder.Configuration["TheMovieDb:Api-Key"] ?? throw new InvalidOperationException("Missing configuration value: TheMovieDb:Api-Key");
 
 string cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Endpoint");
 string cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Database");
 string cosmosContainer = builder.Configuration["Cosmos:Container"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Container");
+
+builder.Services.AddDistributedMemoryCache();
+
+builder.Services.AddHttpClient("HttpClient")
+    .AddStandardResilienceHandler(options =>
+    {
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(60);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(120);
+        options.Retry.MaxRetryAttempts = 3;
+    });
+
+builder.Services.AddSingleton<TMDbClient>(sp => new TMDbClient(tmdbApiKey));
+builder.Services.AddSingleton<TheMovieDBKernelFunctions>();
+
+builder.Services.AddSingleton<IChatClient>(sp =>
+{
+    IHttpClientFactory httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+    HttpClient httpClient = httpClientFactory.CreateClient("HttpClient");
+    ILoggerFactory loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+    AzureOpenAIClientOptions clientOptions = new AzureOpenAIClientOptions
+    {
+        Transport = new HttpClientPipelineTransport(httpClient)
+    };
+
+    AzureOpenAIClient azureOpenAiClient = new AzureOpenAIClient(
+        endpoint,
+        new ApiKeyCredential(apiKey),
+        clientOptions);
+
+    return azureOpenAiClient
+        .GetChatClient(deploymentName)
+        .AsIChatClient()
+        .AsBuilder()
+        .UseFunctionInvocation(loggerFactory, client =>
+        {
+            client.MaximumIterationsPerRequest = 12;
+        })
+        .Build(sp);
+});
+
+builder.Services.AddSingleton<AIAgent>(sp =>
+{
+    IChatClient chatClient = sp.GetRequiredService<IChatClient>();
+    TheMovieDBKernelFunctions tmdbFunctions = sp.GetRequiredService<TheMovieDBKernelFunctions>();
+    ILoggerFactory loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+    List<AITool> tools =
+    [
+        .. tmdbFunctions.CreateTools(),
+        .. DateTimeKernelFunctions.CreateTools(),
+    ];
+
+    return chatClient.AsAIAgent(
+        new ChatClientAgentOptions
+        {
+            Name = "MovieTracker.Api",
+            ChatOptions = new ChatOptions { Tools = tools }
+        },
+        loggerFactory,
+        sp);
+});
 
 builder.Services.AddSingleton(sp => new CosmosClient(cosmosEndpoint, new DefaultAzureCredential(), new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));
 
@@ -143,13 +162,59 @@ app.MapGet("/health/cosmos", async (CosmosClient cosmosClient, IConfiguration co
 })
     .WithName("CosmosHealth");
 
+app.MapGet("/health/tmdb", async (TMDbClient tmdbClient, ILogger<Program> logger) =>
+{
+    try
+    {
+        await tmdbClient.GetConfigAsync();
+        return Results.Ok(new { status = "ok", baseUrl = "https://api.themoviedb.org/3" });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "TMDb probe failed");
+        return Results.Json(new { status = "fail", reason = "unavailable" }, statusCode: 503);
+    }
+})
+    .WithName("TmdbHealth");
+
+app.MapGet("/health/openai", async (IChatClient chatClient, IConfiguration configuration, ILogger<Program> logger) =>
+{
+    string endpointHost = new Uri(configuration["AzureOpenAI:Endpoint"]!).Host;
+    string deployment = configuration["AzureOpenAI:DeploymentName"]!;
+
+    using CancellationTokenSource cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+    try
+    {
+        await chatClient.GetResponseAsync(
+            [new AIChatMessage(ChatRole.User, "ping")],
+            new ChatOptions { MaxOutputTokens = 1 },
+            cts.Token);
+        return Results.Ok(new { status = "ok", endpoint = endpointHost, deployment });
+    }
+    catch (OperationCanceledException)
+    {
+        return Results.Json(
+            new { status = "fail", reason = "timeout", endpoint = endpointHost, deployment },
+            statusCode: 503);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "OpenAI probe failed");
+        return Results.Json(
+            new { status = "fail", reason = "unavailable", endpoint = endpointHost, deployment },
+            statusCode: 503);
+    }
+})
+    .WithName("OpenAiHealth");
+
 app.MapGet("/api/chat/start", async (ChatSessionRepository repo, ILogger<Program> logger) =>
 {
     try
     {
-        List<Microsoft.Extensions.AI.ChatMessage> initialHistory = new List<Microsoft.Extensions.AI.ChatMessage>
+        List<AIChatMessage> initialHistory = new List<AIChatMessage>
         {
-            new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.System, ChatStartSystemPrompt.Text)
+            new AIChatMessage(ChatRole.System, ChatStartSystemPrompt.Text)
         };
         MoviceTrackerChatSession session = await repo.NewChatSession(initialHistory);
         return Results.Ok(new { chatId = session.id });
@@ -161,6 +226,12 @@ app.MapGet("/api/chat/start", async (ChatSessionRepository repo, ILogger<Program
     }
 })
     .WithName("ChatStart");
+
+app.MapPost("/api/chat/{chatId}/ask", ChatTurnEndpoints.Ask)
+    .WithName("ChatAsk");
+
+app.MapPost("/api/chat/{chatId}/ask/v2", ChatTurnEndpoints.AskV2)
+    .WithName("ChatAskV2");
 
 app.MapGet("/version", () =>
 {
