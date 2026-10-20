@@ -181,8 +181,8 @@ Single ASP.NET Core project rooted at `MovieTracker.Api/`. Ported Function App s
 
 ### Deployed verification (OWNER deploys first)
 
-- [ ] T037 Wait for the OWNER to deploy a new revision of the `movie-tracker-api` Container App that includes the Phase 2–6 changes (reference: `specs/003-agent-turn/quickstart.md` "Deployed run" section for the FQDN convention). Do NOT run `az acr build`, `az containerapp update`, or any other deploy command — deploy is an OWNER step. Record the deployed revision's ingress FQDN as `<fqdn>` for T038.
-- [ ] T038 Against the deployed `<fqdn>`, re-run `specs/003-agent-turn/quickstart.md` "Deployed run" (Checks 1-4 and 7-10; Check 5 optional; Check 6 is local-only). Replace `http://localhost:5065` with `https://<fqdn>` in every curl command. All expected outputs match the local runs. If any check fails against the deployed revision, record the failing check and halt — do not deploy a fix via `az`; hand it back to the OWNER.
+- [X] T037 Wait for the OWNER to deploy a new revision of the `movie-tracker-api` Container App that includes the Phase 2–6 changes (reference: `specs/003-agent-turn/quickstart.md` "Deployed run" section for the FQDN convention). Do NOT run `az acr build`, `az containerapp update`, or any other deploy command — deploy is an OWNER step. Record the deployed revision's ingress FQDN as `<fqdn>` for T038.
+- [X] T038 Against the deployed `<fqdn>`, re-run `specs/003-agent-turn/quickstart.md` "Deployed run" (Checks 1-4 and 7-10; Check 5 optional; Check 6 is local-only). Replace `http://localhost:5065` with `https://<fqdn>` in every curl command. All expected outputs match the local runs. If any check fails against the deployed revision, record the failing check and halt — do not deploy a fix via `az`; hand it back to the OWNER.
 
 ---
 

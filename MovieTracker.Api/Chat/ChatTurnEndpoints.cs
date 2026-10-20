@@ -14,6 +14,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Compaction;
 using Microsoft.Extensions.AI;
 using MovieTracker.Api.ChatSessions;
+using MovieTracker.Api.Prompts;
 using TMDbLib.Client;
 using TMDbLib.Objects.General;
 using TMDbLib.Objects.Movies;
@@ -165,6 +166,7 @@ public static class ChatTurnEndpoints
         HttpRequest request,
         ChatSessionRepository repo,
         AIAgent agent,
+        ChatPlanner chatPlanner,
         IDistributedCache cache,
         TMDbClient tmdbClient,
         ILogger<ChatMessageResponse> logger)
@@ -202,7 +204,7 @@ public static class ChatTurnEndpoints
             }
 
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
-            await RunTurnAsync(agent, chatSession, ask.Input);
+            await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger);
 
             List<ChatMessage> responseMessages = new List<ChatMessage>();
             foreach (AIChatMessage message in chatSession.ChatHistory)
@@ -216,7 +218,7 @@ public static class ChatTurnEndpoints
 
             await SaveSessionAsync(repo, chatSession, sessionCache, logger);
 
-            return Results.Ok(new ChatMessageResponse(null, responseMessages));
+            return Results.Ok(new ChatMessageResponse(chatSession.FunnyFact, responseMessages));
         }
         catch (Exception ex)
         {
@@ -230,6 +232,7 @@ public static class ChatTurnEndpoints
         HttpRequest request,
         ChatSessionRepository repo,
         AIAgent agent,
+        ChatPlanner chatPlanner,
         IDistributedCache cache,
         TMDbClient tmdbClient,
         ILogger<ChatTurnResponse> logger)
@@ -267,7 +270,7 @@ public static class ChatTurnEndpoints
             }
 
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
-            AIChatMessage? newAssistantMessage = await RunTurnAsync(agent, chatSession, ask.Input);
+            AIChatMessage? newAssistantMessage = await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger);
 
             ChatMessage turn;
             if (newAssistantMessage == null)
@@ -282,7 +285,7 @@ public static class ChatTurnEndpoints
 
             await SaveSessionAsync(repo, chatSession, sessionCache, logger);
 
-            return Results.Ok(new ChatTurnResponse(null, turn));
+            return Results.Ok(new ChatTurnResponse(chatSession.FunnyFact, turn));
         }
         catch (Exception ex)
         {
@@ -320,9 +323,11 @@ public static class ChatTurnEndpoints
         await repo.SaveChatSession(session);
     }
 
-    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, MoviceTrackerChatSession chatSession, string input)
+    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, ChatPlanner chatPlanner, MoviceTrackerChatSession chatSession, string input, ILogger logger)
     {
         List<AIChatMessage> chatMessages = chatSession.ChatHistory;
+
+        Task<string?> funnyFactTask = SafeGenerateFunnyFactAsync(chatPlanner, input, logger);
 
         chatMessages.Add(new AIChatMessage(ChatRole.User, input));
 
@@ -338,8 +343,27 @@ public static class ChatTurnEndpoints
 
         chatMessages.AddRange(result.Messages);
 
+        string? funnyFact = await funnyFactTask;
+        if (funnyFact != null)
+        {
+            chatSession.FunnyFact = funnyFact;
+        }
+
         return result.Messages.LastOrDefault(
             message => message.Role == ChatRole.Assistant && !string.IsNullOrEmpty(message.Text));
+    }
+
+    private static async Task<string?> SafeGenerateFunnyFactAsync(ChatPlanner chatPlanner, string input, ILogger logger)
+    {
+        try
+        {
+            return await chatPlanner.GenerateEnhancedFunnyFact(input);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Funny fact generation failed; answering without one");
+            return null;
+        }
     }
 
     private static async Task<ChatMessage?> ToClientMessageAsync(

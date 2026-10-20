@@ -36,6 +36,11 @@ var secrets = [
     keyVaultUrl: '${keyVaultUri}/themoviedb-api-key'
     identity: managedIdentityId
   }
+  {
+    name: 'omdb-api-key'
+    keyVaultUrl: '${keyVaultUri}/omdb-api-key'
+    identity: managedIdentityId
+  }
 ]
 
 var envVars = [
@@ -54,6 +59,10 @@ var envVars = [
   {
     name: 'TheMovieDb__Api-Key'
     secretRef: 'themoviedb-api-key'
+  }
+  {
+    name: 'OpenMovieDb__Api-Key'
+    secretRef: 'omdb-api-key'
   }
   {
     name: 'Cosmos__Endpoint'
