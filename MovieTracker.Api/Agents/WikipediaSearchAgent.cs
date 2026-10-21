@@ -118,6 +118,9 @@ public class WikipediaSearchAgent
                     case "director":
                         ParseDirectorBinding(binding, facts, relatedEntities);
                         break;
+                    default:
+                        ParseMovieBinding(binding, facts, relatedEntities);
+                        break;
                 }
             }
 
