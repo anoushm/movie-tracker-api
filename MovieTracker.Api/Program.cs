@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using Azure;
 using Azure.AI.OpenAI;
@@ -10,6 +11,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
+using MovieTracker.Api.Agents;
 using MovieTracker.Api.Chat;
 using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Core;
@@ -44,7 +46,24 @@ builder.Services.AddHttpClient("HttpClient")
 builder.Services.AddSingleton<TMDbClient>(sp => new TMDbClient(tmdbApiKey));
 builder.Services.AddSingleton<TheMovieDBKernelFunctions>();
 
-builder.Services.AddSingleton<IChatClient>(sp =>
+builder.Services.AddHttpClient<WikipediaSearchAgent>(httpClient =>
+{
+    string serviceName = typeof(Program).Assembly.GetName().Name ?? "MovieTracker.Api";
+    string serviceVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+
+    httpClient.DefaultRequestHeaders.UserAgent.Add(
+        new ProductInfoHeaderValue(serviceName, serviceVersion));
+    httpClient.DefaultRequestHeaders.UserAgent.Add(
+        new ProductInfoHeaderValue("(+https://github.com/anoushm/movie-tracker-api)"));
+
+    httpClient.Timeout = TimeSpan.FromSeconds(15);
+});
+
+builder.Services.AddScoped<OpenMovieDbAgent>();
+builder.Services.AddScoped<TrailerAgent>();
+builder.Services.AddScoped<ChatPlanner>();
+
+builder.Services.AddScoped<IChatClient>(sp =>
 {
     IHttpClientFactory httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
     HttpClient httpClient = httpClientFactory.CreateClient("HttpClient");
@@ -71,16 +90,18 @@ builder.Services.AddSingleton<IChatClient>(sp =>
         .Build(sp);
 });
 
-builder.Services.AddSingleton<AIAgent>(sp =>
+builder.Services.AddScoped<AIAgent>(sp =>
 {
     IChatClient chatClient = sp.GetRequiredService<IChatClient>();
     TheMovieDBKernelFunctions tmdbFunctions = sp.GetRequiredService<TheMovieDBKernelFunctions>();
+    ChatPlanner chatPlanner = sp.GetRequiredService<ChatPlanner>();
     ILoggerFactory loggerFactory = sp.GetRequiredService<ILoggerFactory>();
 
     List<AITool> tools =
     [
         .. tmdbFunctions.CreateTools(),
         .. DateTimeKernelFunctions.CreateTools(),
+        .. chatPlanner.CreateTools(),
     ];
 
     return chatClient.AsAIAgent(
