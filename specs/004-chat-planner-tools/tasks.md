@@ -179,14 +179,14 @@ Single ASP.NET Core project rooted at `MovieTracker.Api/`. Ported Function App s
 
 **Purpose**: Owner triggers the deploy and re-runs the US1-US4 checks against the deployed Container App to prove the Key Vault → container env var → `IConfiguration` wiring resolves end to end (SC-005).
 
-- [ ] T025 [OWNER] Pre-merge review gate. Before merging the PR, confirm:
+- [X] T025 [OWNER] Pre-merge review gate. Before merging the PR, confirm:
     - The `Validate Bicep` and `What-If` workflow jobs on the PR are green (constitution Development Workflow). A What-If showing an unexpected delete or replace on any resource other than the Container App revision (which `activeRevisionsMode: 'Single'` naturally cycles) **blocks** the merge.
     - Code review covered the quickstart Static review items: SC-002 (one `AddScoped<AIAgent>` block whose tool list ends with `.. chatPlanner.CreateTools()`), SC-003 (container-app.bicep has the `omdb-api-key` secrets entry under the managed identity and the `OpenMovieDb__Api-Key` env var with `secretRef`; `key-vault.bicep` is unchanged; `appsettings*.json` carries no OMDb entry), SC-006 (env var is `secretRef`, not `value`), SC-007 (ported files are present at `Agents/` and `Prompts/ChatPlanner.cs`; `OmdbApiNet` 1.3.0 is the only new PackageReference).
-- [ ] T026 [OWNER] Merge the PR to trigger the deploy via the existing GitHub Actions workflow. **Do NOT** run `az acr build` or `az containerapp update` from the local workstation; deployment is pipeline-triggered. After the merge, **wait for the deploy pipeline to complete successfully** and confirm the Container App revision now serves the slice's image before proceeding to T027-T030. One cheap confirmation: `GET /version` on the deployed FQDN returns an `ImageTag` / `GitSha` matching the merged commit.
-- [ ] T027 [OWNER] [US1] Repeat `quickstart.md` **Check 1** against the deployed Container App FQDN. The IMDb rating the chat text names MUST match what `omdbapi.com` reports for `tt1375666` at the time of the check (SC-005). A direct `omdbapi.com` call from the owner's workstation using the newly issued key is the cross-check.
+- [X] T026 [OWNER] Merge the PR to trigger the deploy via the existing GitHub Actions workflow. **Do NOT** run `az acr build` or `az containerapp update` from the local workstation; deployment is pipeline-triggered. After the merge, **wait for the deploy pipeline to complete successfully** and confirm the Container App revision now serves the slice's image before proceeding to T027-T030. One cheap confirmation: `GET /version` on the deployed FQDN returns an `ImageTag` / `GitSha` matching the merged commit.
+- [X] T027 [OWNER] [US1] Repeat `quickstart.md` **Check 1** against the deployed Container App FQDN. The IMDb rating the chat text names MUST match what `omdbapi.com` reports for `tt1375666` at the time of the check (SC-005). A direct `omdbapi.com` call from the owner's workstation using the newly issued key is the cross-check.
 - [ ] T028 [OWNER] [US2] Repeat `quickstart.md` **Check 2** against the deployed FQDN. The `[TRAILER]` wrapper must appear with a working YouTube key.
 - [ ] T029 [OWNER] [US3] Repeat `quickstart.md` **Check 3** against the deployed FQDN. Non-null fact on fresh chat with a qualifying input; `null` on a generic input. SC-008's re-run allowance applies.
-- [ ] T030 [OWNER] [US4] Repeat `quickstart.md` **Check 4** against the deployed FQDN.
+- [X] T030 [OWNER] [US4] Repeat `quickstart.md` **Check 4** against the deployed FQDN.
 
 **Checkpoint**: Slice 004 is deployed and verified end-to-end against both local and deployed environments.
 
