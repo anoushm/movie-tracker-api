@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using Azure;
 using Azure.AI.OpenAI;
 using Azure.Identity;
+using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Agents.AI;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.AI;
@@ -16,8 +17,14 @@ using MovieTracker.Api.Chat;
 using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Core;
 using MovieTracker.Api.Prompts;
+using MovieTracker.Api.Telemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using TMDbLib.Client;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using TelemetryHelpers = MovieTracker.Api.Telemetry.Telemetry;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +38,54 @@ string tmdbApiKey = builder.Configuration["TheMovieDb:Api-Key"] ?? throw new Inv
 string cosmosEndpoint = builder.Configuration["Cosmos:Endpoint"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Endpoint");
 string cosmosDatabase = builder.Configuration["Cosmos:Database"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Database");
 string cosmosContainer = builder.Configuration["Cosmos:Container"] ?? throw new InvalidOperationException("Missing configuration value: Cosmos:Container");
+
+bool enableSensitiveTelemetry = builder.Configuration.GetValue<bool?>("Telemetry:Enable-Sensitive-Data") ?? true;
+
+if (double.TryParse(builder.Configuration["AzureOpenAI:Price-Input-Per-1M"], out double inputRate)
+    && double.TryParse(builder.Configuration["AzureOpenAI:Price-Output-Per-1M"], out double outputRate))
+{
+    double? cachedRate = double.TryParse(builder.Configuration["AzureOpenAI:Price-Cached-Input-Per-1M"], out double parsedCached)
+        ? parsedCached
+        : null;
+    builder.Services.AddSingleton(new ModelPricing(inputRate, outputRate, cachedRate));
+}
+
+builder.Services.AddSingleton(TracerProvider.Default.GetTracer(TelemetryHelpers.SourceName, TelemetryHelpers.ServiceVersion));
+
+string? appInsightsConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+ResourceBuilder telemetryResource = ResourceBuilder.CreateDefault()
+    .AddService(TelemetryHelpers.SourceName, TelemetryHelpers.ServiceVersion);
+
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.SetResourceBuilder(telemetryResource);
+    options.AddAzureMonitorLogExporter(exporter =>
+    {
+        exporter.ConnectionString = appInsightsConnectionString;
+        exporter.EnableTraceBasedLogsSampler = false;
+    });
+});
+
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing.AddSource(TelemetryHelpers.SourceName)
+            .AddSource("Microsoft.Extensions.AI*")
+            .AddSource("Microsoft.Agents.AI*")
+            .AddSource("Azure.AI.OpenAI*")
+            .AddSource("OpenAI*")
+            .SetResourceBuilder(telemetryResource)
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddAzureMonitorTraceExporter(options => options.ConnectionString = appInsightsConnectionString);
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics.AddMeter(TelemetryHelpers.SourceName)
+            .SetResourceBuilder(telemetryResource)
+            .AddHttpClientInstrumentation()
+            .AddAzureMonitorMetricExporter(options => options.ConnectionString = appInsightsConnectionString);
+    });
 
 builder.Services.AddDistributedMemoryCache();
 
@@ -87,6 +142,7 @@ builder.Services.AddScoped<IChatClient>(sp =>
         {
             client.MaximumIterationsPerRequest = 12;
         })
+        .UseOpenTelemetry(loggerFactory, TelemetryHelpers.SourceName, options => options.EnableSensitiveData = enableSensitiveTelemetry)
         .Build(sp);
 });
 
@@ -104,6 +160,12 @@ builder.Services.AddScoped<AIAgent>(sp =>
         .. chatPlanner.CreateTools(),
     ];
 
+    ILogger toolLogger = loggerFactory.CreateLogger("MovieTracker.Api.ToolCalls");
+    tools = [.. tools.Select(tool =>
+        tool is AIFunction function
+            ? new InstrumentedAIFunction(function, toolLogger, enableSensitiveTelemetry)
+            : tool)];
+
     return chatClient.AsAIAgent(
         new ChatClientAgentOptions
         {
@@ -116,7 +178,12 @@ builder.Services.AddScoped<AIAgent>(sp =>
 
 builder.Services.AddSingleton(sp => new CosmosClient(cosmosEndpoint, new DefaultAzureCredential(), new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));
 
-builder.Services.AddSingleton(sp => new ChatSessionRepository(sp.GetRequiredService<CosmosClient>(), cosmosDatabase, cosmosContainer));
+builder.Services.AddSingleton(sp => new ChatSessionRepository(
+    sp.GetRequiredService<CosmosClient>(),
+    cosmosDatabase,
+    cosmosContainer,
+    sp.GetRequiredService<Tracer>(),
+    sp.GetRequiredService<ILogger<ChatSessionRepository>>()));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -229,8 +296,9 @@ app.MapGet("/health/openai", async (IChatClient chatClient, IConfiguration confi
 })
     .WithName("OpenAiHealth");
 
-app.MapGet("/api/chat/start", async (ChatSessionRepository repo, ILogger<Program> logger) =>
+app.MapGet("/api/chat/start", async (ChatSessionRepository repo, Tracer tracer, ILogger<Program> logger) =>
 {
+    using TelemetrySpan activity = tracer.StartActiveSpan("movie-tracker-api.chat-start");
     try
     {
         List<AIChatMessage> initialHistory = new List<AIChatMessage>
