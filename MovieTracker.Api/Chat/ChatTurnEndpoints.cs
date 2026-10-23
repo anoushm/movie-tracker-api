@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
@@ -175,7 +176,7 @@ public static class ChatTurnEndpoints
         IDistributedCache cache,
         TMDbClient tmdbClient,
         ILogger<ChatMessageResponse> logger,
-        ModelPricing? modelPricing,
+        [FromServices] ModelPricing? modelPricing,
         IConfiguration configuration,
         Tracer tracer)
     {
@@ -246,7 +247,7 @@ public static class ChatTurnEndpoints
         IDistributedCache cache,
         TMDbClient tmdbClient,
         ILogger<ChatTurnResponse> logger,
-        ModelPricing? modelPricing,
+        [FromServices] ModelPricing? modelPricing,
         IConfiguration configuration,
         Tracer tracer)
     {
