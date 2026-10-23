@@ -41,16 +41,14 @@ string cosmosContainer = builder.Configuration["Cosmos:Container"] ?? throw new 
 
 bool enableSensitiveTelemetry = builder.Configuration.GetValue<bool?>("Telemetry:Enable-Sensitive-Data") ?? true;
 
-ModelPricing? modelPricing = null;
 if (double.TryParse(builder.Configuration["AzureOpenAI:Price-Input-Per-1M"], out double inputRate)
     && double.TryParse(builder.Configuration["AzureOpenAI:Price-Output-Per-1M"], out double outputRate))
 {
     double? cachedRate = double.TryParse(builder.Configuration["AzureOpenAI:Price-Cached-Input-Per-1M"], out double parsedCached)
         ? parsedCached
         : null;
-    modelPricing = new ModelPricing(inputRate, outputRate, cachedRate);
+    builder.Services.AddSingleton(new ModelPricing(inputRate, outputRate, cachedRate));
 }
-builder.Services.AddSingleton<ModelPricing?>(_ => modelPricing);
 
 builder.Services.AddSingleton(TracerProvider.Default.GetTracer(TelemetryHelpers.SourceName, TelemetryHelpers.ServiceVersion));
 
