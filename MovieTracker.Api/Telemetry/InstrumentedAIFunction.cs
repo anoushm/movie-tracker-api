@@ -32,7 +32,13 @@ internal sealed class InstrumentedAIFunction(
 
     private void LogCall(AIFunctionArguments arguments, TimeSpan elapsed, Exception? error)
     {
-        if (logger is null || !logger.IsEnabled(LogLevel.Information))
+        if (logger is null)
+        {
+            return;
+        }
+
+        LogLevel level = error is null ? LogLevel.Information : LogLevel.Warning;
+        if (!logger.IsEnabled(level))
         {
             return;
         }
