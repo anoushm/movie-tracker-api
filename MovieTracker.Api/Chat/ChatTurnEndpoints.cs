@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
@@ -9,16 +10,20 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Compaction;
 using Microsoft.Extensions.AI;
 using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Prompts;
+using MovieTracker.Api.Telemetry;
+using OpenTelemetry.Trace;
 using TMDbLib.Client;
 using TMDbLib.Objects.General;
 using TMDbLib.Objects.Movies;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using TelemetryHelpers = MovieTracker.Api.Telemetry.Telemetry;
 
 namespace MovieTracker.Api.Chat;
 
@@ -169,10 +174,15 @@ public static class ChatTurnEndpoints
         ChatPlanner chatPlanner,
         IDistributedCache cache,
         TMDbClient tmdbClient,
-        ILogger<ChatMessageResponse> logger)
+        ILogger<ChatMessageResponse> logger,
+        ModelPricing? modelPricing,
+        IConfiguration configuration,
+        Tracer tracer)
     {
+        string deployedModel = configuration["AzureOpenAI:DeploymentName"]!;
         try
         {
+            using TelemetrySpan activity = tracer.StartActiveSpan("movie-tracker-api.chat-ask");
             if (!request.HasJsonContentType())
             {
                 return Results.BadRequest(new { error = "Invalid request, missing ask object" });
@@ -204,7 +214,7 @@ public static class ChatTurnEndpoints
             }
 
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
-            await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger);
+            await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger, modelPricing, deployedModel);
 
             List<ChatMessage> responseMessages = new List<ChatMessage>();
             foreach (AIChatMessage message in chatSession.ChatHistory)
@@ -235,10 +245,15 @@ public static class ChatTurnEndpoints
         ChatPlanner chatPlanner,
         IDistributedCache cache,
         TMDbClient tmdbClient,
-        ILogger<ChatTurnResponse> logger)
+        ILogger<ChatTurnResponse> logger,
+        ModelPricing? modelPricing,
+        IConfiguration configuration,
+        Tracer tracer)
     {
+        string deployedModel = configuration["AzureOpenAI:DeploymentName"]!;
         try
         {
+            using TelemetrySpan activity = tracer.StartActiveSpan("movie-tracker-api.chat-ask-v2");
             if (!request.HasJsonContentType())
             {
                 return Results.BadRequest(new { error = "Invalid request, missing ask object" });
@@ -270,7 +285,7 @@ public static class ChatTurnEndpoints
             }
 
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
-            AIChatMessage? newAssistantMessage = await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger);
+            AIChatMessage? newAssistantMessage = await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger, modelPricing, deployedModel);
 
             ChatMessage turn;
             if (newAssistantMessage == null)
@@ -323,7 +338,7 @@ public static class ChatTurnEndpoints
         await repo.SaveChatSession(session);
     }
 
-    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, ChatPlanner chatPlanner, MoviceTrackerChatSession chatSession, string input, ILogger logger)
+    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, ChatPlanner chatPlanner, MoviceTrackerChatSession chatSession, string input, ILogger logger, ModelPricing? modelPricing, string deployedModel)
     {
         List<AIChatMessage> chatMessages = chatSession.ChatHistory;
 
@@ -339,9 +354,22 @@ public static class ChatTurnEndpoints
         IEnumerable<AIChatMessage> reduced = await ContextReducer.ReduceAsync([.. chatMessages], default);
         List<AIChatMessage> modelMessages = reduced.ToList();
 
+        if (chatMessages.Count > 0)
+        {
+            TelemetryHelpers.ContextRetainedRatio.Record((double)modelMessages.Count / chatMessages.Count);
+        }
+
+        logger.LogInformation(
+            "Chat-Ask context: sending {IncludedMessages} of {TotalMessages} stored messages to the model",
+            modelMessages.Count, chatMessages.Count);
+
         AgentResponse result = await agent.RunAsync(modelMessages, null, new ChatClientAgentRunOptions(chatOptions));
 
         chatMessages.AddRange(result.Messages);
+
+        TelemetryHelpers.ToolCallsPerTurn.Record(result.Messages.SelectMany(message => message.Contents).OfType<FunctionCallContent>().Count());
+
+        LogUsage(result, logger, modelPricing, deployedModel);
 
         string? funnyFact = await funnyFactTask;
         if (funnyFact != null)
@@ -363,6 +391,48 @@ public static class ChatTurnEndpoints
         {
             logger.LogWarning(ex, "Funny fact generation failed; answering without one");
             return null;
+        }
+    }
+
+    private static void LogUsage(AgentResponse result, ILogger logger, ModelPricing? modelPricing, string deployedModel)
+    {
+        if (result.Usage is not { } usage)
+        {
+            return;
+        }
+
+        logger.LogInformation(
+            "Chat-Ask usage: input={InputTokens} cachedInput={CachedInputTokens} output={OutputTokens} reasoning={ReasoningTokens} total={TotalTokens}",
+            usage.InputTokenCount,
+            usage.CachedInputTokenCount,
+            usage.OutputTokenCount,
+            usage.ReasoningTokenCount,
+            usage.TotalTokenCount);
+
+        Activity? activity = Activity.Current;
+        if (activity != null)
+        {
+            if (usage.InputTokenCount is { } inputTokens)
+            {
+                activity.SetTag("gen_ai.usage.input_tokens", inputTokens);
+            }
+            if (usage.OutputTokenCount is { } outputTokens)
+            {
+                activity.SetTag("gen_ai.usage.output_tokens", outputTokens);
+            }
+            if (usage.CachedInputTokenCount is { } cachedInputTokens)
+            {
+                activity.SetTag("gen_ai.usage.cache_read.input_tokens", cachedInputTokens);
+            }
+            if (usage.ReasoningTokenCount is { } reasoningTokens)
+            {
+                activity.SetTag("gen_ai.usage.reasoning.output_tokens", reasoningTokens);
+            }
+        }
+
+        if (modelPricing is { } pricing)
+        {
+            TelemetryHelpers.RecordCost(deployedModel, usage, pricing);
         }
     }
 
