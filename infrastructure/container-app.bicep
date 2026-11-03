@@ -109,7 +109,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
         corsPolicy: {
-          allowedOrigins: ['*']
+          allowedOrigins: [
+            'https://green-mud-037bbdc1e.5.azurestaticapps.net'
+            'http://localhost:4200'
+          ]
           allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
           allowedHeaders: ['*']
           allowCredentials: false
