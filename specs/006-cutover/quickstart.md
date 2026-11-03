@@ -39,7 +39,7 @@ corsPolicy: {
 }
 ```
 
-Commit on `006-cutover`. The PR will run the existing `Validate Bicep` and `What-If` workflows. The What-If output must show exactly one property change (the `allowedOrigins` field under `corsPolicy`) with no delete / replace actions. Investigate anything else before merging.
+Commit on `006-cutover`. The PR will run the existing `Validate Bicep` and `What-If` workflows. The intended What-If change is on `Microsoft.App/containerApps/movie-tracker-api`'s ingress `corsPolicy.allowedOrigins` field with no delete / replace actions. Any additional change in the output is investigated and resolved before merge (per SC-006); the gate is "unexpected delete or replace blocks the merge," not a property-count rule.
 
 Once merged into `main`, the deploy workflow applies the change. **Verify the deployed value before continuing**:
 
@@ -51,14 +51,7 @@ az containerapp show `
   --query 'properties.configuration.ingress.corsPolicy.allowedOrigins'
 ```
 
-Expected output:
-
-```json
-[
-  "https://green-mud-037bbdc1e.5.azurestaticapps.net",
-  "http://localhost:4200"
-]
-```
+Expected: the two parity origins (production SWA host and `http://localhost:4200`), no `*`.
 
 ### A.3 Step 2 — Deploy the frontend URL change
 
@@ -170,13 +163,14 @@ If the `az graph query` returns zero rows, the Function App is not visible under
 
 ### A.7 Rollback (if any step fails)
 
-Full rollback (every step applied in reverse of what has run so far):
+Rollback restores the Function App, reverts the frontend URL, and redeploys the SWA, as described in FR-006. Apply in reverse of what has run so far:
 
 1. If step 5 ran and the Function App is `Stopped`: `az functionapp start --ids $functionAppId`.
 2. If step 2 ran and the frontend `chatBaseUrl` was changed: in `movie-tracker-app`, `git revert` the URL commit on `main` and push. The push fires the same SWA workflow (build → staging → E2E → promote) and restores the Function App URL in the deployed bundle. Verify in DevTools that the browser is hitting the Function App again.
-3. If step 1 ran and the Container App CORS was tightened: open a revert PR on `006-cutover` (or on `main` if the CORS change already merged) that puts `allowedOrigins` back to `['*']`. Merging the revert PR fires the existing Bicep deploy workflow, which re-applies the wildcard allowlist. Verify with `az containerapp show ... --query 'properties.configuration.ingress.corsPolicy.allowedOrigins'`.
 
-Each rollback step is an independent revert; apply only the ones whose forward step has run.
+The parity CORS set from step A.2 stays in place during rollback. The Function App's historical allowlist already included the production SWA origin, so a browser targeting the restored Function App URL is unaffected by the Container App's tightened allowlist. Reverting the CORS set to `['*']` is explicitly out of scope and would re-introduce the wildcard FR-004 forbids.
+
+Each rollback step is independent; apply only the ones whose forward step has run.
 
 ---
 
@@ -220,10 +214,6 @@ Open `http://localhost:4200` in a browser with DevTools' Network tab open.
 
 If the preflight is rejected (`Access-Control-Allow-Origin` absent), the Container App's CORS parity set was not deployed. Go back to section A.2.
 
-### B.5 Why no proxy, no CORS workaround, no local env file
+### B.5 No proxy, no CORS workaround, no local env file
 
-- The Container App's CORS allowlist already includes `http://localhost:4200` (FR-003), so the browser's preflight passes without any workaround.
-- No `proxy.conf.*` is introduced (confirmed to not exist today; FR-002 forbids introducing one).
-- No per-environment file split is introduced (confirmed single `enviroments.ts`; FR-002 forbids introducing one).
-
-The slice's design intent is: the same `enviroments.ts` the frontend ships, run from `ng serve`, is enough to drive the deployed Container App locally.
+The CORS allowlist already includes `http://localhost:4200` (FR-003), and FR-002 forbids introducing a `proxy.conf.*` or a per-environment env file. The same `enviroments.ts` the frontend ships, run from `ng serve`, is enough to drive the deployed Container App locally.
