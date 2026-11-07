@@ -5,8 +5,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
@@ -17,13 +17,15 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Compaction;
 using Microsoft.Extensions.AI;
 using MovieTracker.Api.ChatSessions;
-using MovieTracker.Api.Prompts;
+using MovieTracker.Api.Models;
 using MovieTracker.Api.Telemetry;
+using MovieTracker.Api.Tools;
 using OpenTelemetry.Trace;
 using TMDbLib.Client;
 using TMDbLib.Objects.General;
 using TMDbLib.Objects.Movies;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using ClientChatMessage = MovieTracker.Api.Models.ChatMessage;
 using TelemetryHelpers = MovieTracker.Api.Telemetry.Telemetry;
 
 namespace MovieTracker.Api.Chat;
@@ -167,7 +169,36 @@ public static class ChatTurnEndpoints
     }
 #pragma warning restore MAAI001
 
-    public static async Task<IResult> Ask(
+    public static void MapChatEndpoints(this WebApplication app)
+    {
+        app.MapGet("/api/chat/start", async (ChatSessionRepository repo, Tracer tracer, ILogger<Program> logger) =>
+        {
+            using TelemetrySpan activity = tracer.StartActiveSpan("movie-tracker-api.chat-start");
+            try
+            {
+                List<AIChatMessage> initialHistory = new List<AIChatMessage>
+                {
+                    new AIChatMessage(ChatRole.System, ChatStartSystemPrompt.Text)
+                };
+                MovieTrackerChatSession session = await repo.NewChatSessionAsync(initialHistory);
+                return Results.Ok(new { chatId = session.id });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Chat-Start session creation failed.");
+                return Results.Json(new { error = "Session creation failed." }, statusCode: 503);
+            }
+        })
+            .WithName("ChatStart");
+
+        app.MapPost("/api/chat/{chatId}/ask", AskAsync)
+            .WithName("ChatAsk");
+
+        app.MapPost("/api/chat/{chatId}/ask/v2", AskV2Async)
+            .WithName("ChatAskV2");
+    }
+
+    public static async Task<IResult> AskAsync(
         string chatId,
         HttpRequest request,
         ChatSessionRepository repo,
@@ -204,10 +235,10 @@ public static class ChatTurnEndpoints
                 return Results.BadRequest(new { error = "Invalid request, missing ask object" });
             }
 
-            MoviceTrackerChatSession chatSession;
+            MovieTrackerChatSession chatSession;
             try
             {
-                chatSession = await repo.GetChatSession(chatId);
+                chatSession = await repo.GetChatSessionAsync(chatId);
             }
             catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
             {
@@ -217,10 +248,10 @@ public static class ChatTurnEndpoints
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
             await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger, modelPricing, deployedModel);
 
-            List<ChatMessage> responseMessages = new List<ChatMessage>();
+            List<ClientChatMessage> responseMessages = new List<ClientChatMessage>();
             foreach (AIChatMessage message in chatSession.ChatHistory)
             {
-                ChatMessage? clientMessage = await ToClientMessageAsync(message, sessionCache, cache, tmdbClient, logger);
+                ClientChatMessage? clientMessage = await ToClientMessageAsync(message, sessionCache, cache, tmdbClient, logger);
                 if (clientMessage != null)
                 {
                     responseMessages.Add(clientMessage);
@@ -238,7 +269,7 @@ public static class ChatTurnEndpoints
         }
     }
 
-    public static async Task<IResult> AskV2(
+    public static async Task<IResult> AskV2Async(
         string chatId,
         HttpRequest request,
         ChatSessionRepository repo,
@@ -275,10 +306,10 @@ public static class ChatTurnEndpoints
                 return Results.BadRequest(new { error = "Invalid request, missing ask object" });
             }
 
-            MoviceTrackerChatSession chatSession;
+            MovieTrackerChatSession chatSession;
             try
             {
-                chatSession = await repo.GetChatSession(chatId);
+                chatSession = await repo.GetChatSessionAsync(chatId);
             }
             catch (CosmosException ce) when (ce.StatusCode == HttpStatusCode.NotFound)
             {
@@ -288,14 +319,14 @@ public static class ChatTurnEndpoints
             ConcurrentDictionary<string, MovieViewModel> sessionCache = LoadHydrationCache(chatSession);
             AIChatMessage? newAssistantMessage = await RunTurnAsync(agent, chatPlanner, chatSession, ask.Input, logger, modelPricing, deployedModel);
 
-            ChatMessage turn;
+            ClientChatMessage turn;
             if (newAssistantMessage == null)
             {
                 turn = new AssistantChatMessage("No movies were found", new List<MovieViewModel>());
             }
             else
             {
-                ChatMessage? hydrated = await ToClientMessageAsync(newAssistantMessage, sessionCache, cache, tmdbClient, logger);
+                ClientChatMessage? hydrated = await ToClientMessageAsync(newAssistantMessage, sessionCache, cache, tmdbClient, logger);
                 turn = hydrated ?? new AssistantChatMessage("No movies were found", new List<MovieViewModel>());
             }
 
@@ -310,7 +341,7 @@ public static class ChatTurnEndpoints
         }
     }
 
-    private static ConcurrentDictionary<string, MovieViewModel> LoadHydrationCache(MoviceTrackerChatSession session)
+    private static ConcurrentDictionary<string, MovieViewModel> LoadHydrationCache(MovieTrackerChatSession session)
     {
         if (session.HydratedMovies is null)
         {
@@ -321,7 +352,7 @@ public static class ChatTurnEndpoints
 
     private static async Task SaveSessionAsync(
         ChatSessionRepository repo,
-        MoviceTrackerChatSession session,
+        MovieTrackerChatSession session,
         ConcurrentDictionary<string, MovieViewModel> sessionCache,
         ILogger logger)
     {
@@ -336,10 +367,10 @@ public static class ChatTurnEndpoints
             .Take(HydratedMovieLimit)
             .ToDictionary(entry => entry.Key, entry => entry.Value);
 
-        await repo.SaveChatSession(session);
+        await repo.SaveChatSessionAsync(session);
     }
 
-    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, ChatPlanner chatPlanner, MoviceTrackerChatSession chatSession, string input, ILogger logger, ModelPricing? modelPricing, string deployedModel)
+    private static async Task<AIChatMessage?> RunTurnAsync(AIAgent agent, ChatPlanner chatPlanner, MovieTrackerChatSession chatSession, string input, ILogger logger, ModelPricing? modelPricing, string deployedModel)
     {
         List<AIChatMessage> chatMessages = chatSession.ChatHistory;
 
@@ -386,7 +417,7 @@ public static class ChatTurnEndpoints
     {
         try
         {
-            return await chatPlanner.GenerateEnhancedFunnyFact(input);
+            return await chatPlanner.GenerateEnhancedFunnyFactAsync(input);
         }
         catch (Exception ex)
         {
@@ -437,7 +468,7 @@ public static class ChatTurnEndpoints
         }
     }
 
-    private static async Task<ChatMessage?> ToClientMessageAsync(
+    private static async Task<ClientChatMessage?> ToClientMessageAsync(
         AIChatMessage message,
         ConcurrentDictionary<string, MovieViewModel> sessionCache,
         IDistributedCache cache,

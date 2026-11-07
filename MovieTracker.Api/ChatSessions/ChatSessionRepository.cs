@@ -22,13 +22,13 @@ public class ChatSessionRepository
         this.logger = logger;
     }
 
-    public async Task<MoviceTrackerChatSession> NewChatSession(List<AIChatMessage> chatHistory)
+    public async Task<MovieTrackerChatSession> NewChatSessionAsync(List<AIChatMessage> chatHistory)
     {
         using TelemetrySpan activity = this.tracer.StartActiveSpan("movie-tracker-api.chat-session-repository.new-chat-session");
         try
         {
             string id = GenId();
-            MoviceTrackerChatSession session = new MoviceTrackerChatSession
+            MovieTrackerChatSession session = new MovieTrackerChatSession
             {
                 id = id,
                 PartitionKey = id,
@@ -45,13 +45,13 @@ public class ChatSessionRepository
         }
     }
 
-    public async Task<MoviceTrackerChatSession> GetChatSession(string id)
+    public async Task<MovieTrackerChatSession> GetChatSessionAsync(string id)
     {
         using TelemetrySpan activity = this.tracer.StartActiveSpan("movie-tracker-api.chat-session-repository.get-chat-session");
         try
         {
-            ItemResponse<MoviceTrackerChatSession> response =
-                await this.chatSessionsContainer.ReadItemAsync<MoviceTrackerChatSession>(id, new PartitionKey(id));
+            ItemResponse<MovieTrackerChatSession> response =
+                await this.chatSessionsContainer.ReadItemAsync<MovieTrackerChatSession>(id, new PartitionKey(id));
             return response.Resource;
         }
         catch (Exception ex)
@@ -61,12 +61,12 @@ public class ChatSessionRepository
         }
     }
 
-    public async Task<MoviceTrackerChatSession> SaveChatSession(MoviceTrackerChatSession session)
+    public async Task<MovieTrackerChatSession> SaveChatSessionAsync(MovieTrackerChatSession session)
     {
         using TelemetrySpan activity = this.tracer.StartActiveSpan("movie-tracker-api.chat-session-repository.save-chat-session");
         try
         {
-            ItemResponse<MoviceTrackerChatSession> response =
+            ItemResponse<MovieTrackerChatSession> response =
                 await this.chatSessionsContainer.ReplaceItemAsync(session, session.id, new PartitionKey(session.PartitionKey));
             return response.Resource;
         }
