@@ -13,12 +13,12 @@ namespace MovieTracker.Api.Tools;
 public class WikipediaTools
 {
     private readonly HttpClient httpClient;
-    private readonly ILogger logger;
+    private readonly ILogger<WikipediaTools> logger;
 
-    public WikipediaTools(HttpClient httpClient, ILoggerFactory loggerFactory)
+    public WikipediaTools(HttpClient httpClient, ILogger<WikipediaTools> logger)
     {
         this.httpClient = httpClient;
-        this.logger = loggerFactory.CreateLogger("MovieTracker.Api.Agents.WikipediaSearchAgent");
+        this.logger = logger;
     }
 
     [Description("Gets enhanced movie/actor information from Wikipedia and Wikidata")]
