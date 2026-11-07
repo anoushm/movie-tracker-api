@@ -51,7 +51,7 @@ curl -sL -w "`n%{http_code}`n" http://localhost:<port>/version
 - `/health/cosmos` returns `200` with a JSON object whose top-level keys are `status`, `account`, `database`, `container` (status may be the string `"ok"`; the other three carry live resource names).
 - `/health/tmdb` returns `200` with a JSON object whose top-level keys are `status`, `baseUrl`.
 - `/health/openai` returns `200` with a JSON object whose top-level keys are `status`, `endpoint`, `deployment`.
-- `/version` returns `200` with a JSON object carrying the pre-slice property set (`ImageTag`, `GitSha`, `BuildTime`, `AssemblyVersion`, `Revision`, `Replica`, `Environment`, `Framework`, `StartedAt`, `Uptime`). Timestamps and process-local values are expected to change between runs.
+- `/version` returns `200` with a JSON object carrying the pre-slice property set. The wire keys are camelCase (ASP.NET Core's default serializer): `imageTag`, `gitSha`, `buildTime`, `assemblyVersion`, `revision`, `replica`, `environment`, `framework`, `startedAt`, `uptime`. Timestamps and process-local values are expected to change between runs.
 
 ### C2. Chat start returns a session id
 
