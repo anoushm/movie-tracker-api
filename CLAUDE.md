@@ -39,8 +39,14 @@ az acr build --registry movietracker --image movie-tracker-api:latest MovieTrack
 
 ```
 MovieTracker.Api/           # Main API project
-  Controllers/              # API controllers
-  Program.cs                # Application entry point with minimal hosting
+  Program.cs                # Composition root (minimal hosting)
+  HealthEndpoints.cs        # MapHealthEndpoints extension
+  Agents/                   # MovieAgent (AIAgent registration)
+  Tools/                    # TmdbTools, OmdbTools, TrailerTools, WikipediaTools, DateTimeTools, ChatPlanner, MovieTools (DI registration)
+  Chat/                     # ChatTurnEndpoints (AskAsync, AskV2Async, MapChatEndpoints)
+  Models/                   # Every DTO, record, and view model
+  ChatSessions/             # ChatSessionRepository, MovieTrackerChatSession, ChatStartSystemPrompt, CosmosSystemTextJsonSerializer, ChatSessionRegistration
+  Telemetry/                # InstrumentedAIFunction, ModelPricing, Telemetry, TelemetryRegistration
   Dockerfile                # Container configuration
 infrastructure/             # Azure Bicep IaC templates
   main.bicep                # Main infrastructure template
