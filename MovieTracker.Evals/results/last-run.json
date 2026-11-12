@@ -1,0 +1,114 @@
+{
+  "runAt": "2026-11-12T01:11:32.1332547+00:00",
+  "total": 10,
+  "passed": 4,
+  "perCheck": [
+    {
+      "check": "listIncludes",
+      "passed": 1,
+      "total": 2
+    },
+    {
+      "check": "director",
+      "passed": 0,
+      "total": 1
+    },
+    {
+      "check": "actorFilmography",
+      "passed": 1,
+      "total": 1
+    },
+    {
+      "check": "identifyByPlot",
+      "passed": 0,
+      "total": 1
+    },
+    {
+      "check": "genreDecade",
+      "passed": 1,
+      "total": 1
+    },
+    {
+      "check": "rating",
+      "passed": 0,
+      "total": 1
+    },
+    {
+      "check": "trailer",
+      "passed": 1,
+      "total": 1
+    },
+    {
+      "check": "followUpDirector",
+      "passed": 0,
+      "total": 1
+    },
+    {
+      "check": "funnyFactNotEmpty",
+      "passed": 0,
+      "total": 1
+    }
+  ],
+  "cases": [
+    {
+      "id": "plot-ship-sinks",
+      "check": "listIncludes",
+      "passed": true,
+      "reason": "ok"
+    },
+    {
+      "id": "plot-mob-family",
+      "check": "listIncludes",
+      "passed": false,
+      "reason": "missing \u0027The Godfather\u0027"
+    },
+    {
+      "id": "director-3",
+      "check": "director",
+      "passed": false,
+      "reason": "missing director \u0027Guy Moshe\u0027"
+    },
+    {
+      "id": "actorFilmography-3",
+      "check": "actorFilmography",
+      "passed": true,
+      "reason": "ok"
+    },
+    {
+      "id": "identifyByPlot-3",
+      "check": "identifyByPlot",
+      "passed": false,
+      "reason": "source movie \u0027The Fix\u0027 (id 1228834) is not in the answer"
+    },
+    {
+      "id": "genreDecade-3",
+      "check": "genreDecade",
+      "passed": true,
+      "reason": "ok"
+    },
+    {
+      "id": "rating-3",
+      "check": "rating",
+      "passed": false,
+      "reason": "no truth value"
+    },
+    {
+      "id": "trailer-2",
+      "check": "trailer",
+      "passed": true,
+      "reason": "ok"
+    },
+    {
+      "id": "followUpDirector-1",
+      "check": "followUpDirector",
+      "passed": false,
+      "reason": "missing director \u0027Andrew Stanton\u0027"
+    },
+    {
+      "id": "funnyFactNotEmpty-3",
+      "check": "funnyFactNotEmpty",
+      "passed": false,
+      "reason": "funnyFact null or empty"
+    }
+  ]
+}

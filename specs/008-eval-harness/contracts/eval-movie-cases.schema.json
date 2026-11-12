@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://movie-tracker-api/specs/008-eval-harness/eval-movie-cases.schema.json",
+  "title": "PlotAnchorCaseFile",
+  "description": "Documentation-only. Shape of MovieTracker.Evals/eval-movie-cases.json. Holds the two hand-written plot-anchor cases per spec FR-004; the two entries use check 'listIncludes' and carry an 'expected' array of titles that must all appear in the agent's answer. The harness does NOT validate the file against this schema at run time; the loader enforces only unique ids (see spec FR-004a and data-model.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cases"],
+  "properties": {
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/plotAnchorCase" }
+    }
+  },
+  "$defs": {
+    "plotAnchorCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "question", "check", "expected"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable id, unique within the file."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "check": {
+          "type": "string",
+          "enum": ["listIncludes"]
+        },
+        "expected": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Every entry must appear in the answer per the movie-in-answer rule (spec FR-023 rule 1). Anchors carry no TMDb id, so the check falls straight to the title-fallback path: a match on turn.movieList[*].title OR on turn.text (both case-insensitive) counts."
+        }
+      }
+    }
+  }
+}
