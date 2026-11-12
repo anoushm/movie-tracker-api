@@ -93,7 +93,9 @@ To rotate secrets:
 
 ## Local Development
 
-The local flow is `az login` plus `dotnet run`. No `set` commands, no .NET user-secrets, no secret material on disk. The API and the eval harness both pick up:
+The local flow is `az login` plus `dotnet run` under the Development ASP.NET Core environment. No `set` commands for secrets, no .NET user-secrets, no secret material on disk. The eval harness (`MovieTracker.Evals`) always runs in Development (its `HarnessHost` selects it). For the API itself, Development must be active so `appsettings.Development.json` is loaded — either through a `MovieTracker.Api/Properties/launchSettings.json` with `ASPNETCORE_ENVIRONMENT=Development` (gitignored, per developer) or by exporting `$env:ASPNETCORE_ENVIRONMENT = "Development"` in the shell before `dotnet run --project MovieTracker.Api`.
+
+The API and the eval harness both pick up:
 
 - Secrets (`AzureOpenAI:ApiKey`, `TheMovieDb:Api-Key`, `OpenMovieDb:Api-Key`) from `movie-tracker-kv` via the Azure Key Vault configuration provider, authenticated as you through `AzureCliCredential`.
 - Non-secret endpoint values (`Azure:TenantId`, `KeyVault:Uri`, `Cosmos:Endpoint`) from a local, gitignored `MovieTracker.Api/appsettings.Development.json`:
