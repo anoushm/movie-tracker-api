@@ -1,4 +1,4 @@
-using Azure.Identity;
+using Azure.Core;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,11 +12,12 @@ public static class ChatSessionRegistration
         this IServiceCollection services,
         string cosmosEndpoint,
         string cosmosDatabase,
-        string cosmosContainer)
+        string cosmosContainer,
+        TokenCredential credential)
     {
         services.AddSingleton(sp => new CosmosClient(
             cosmosEndpoint,
-            new DefaultAzureCredential(),
+            credential,
             new CosmosClientOptions { Serializer = new CosmosSystemTextJsonSerializer() }));
 
         services.AddSingleton(sp => new ChatSessionRepository(

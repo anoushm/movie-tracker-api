@@ -27,17 +27,21 @@ public static class TelemetryRegistration
         builder.Services.AddSingleton(TracerProvider.Default.GetTracer(TelemetryHelpers.SourceName, TelemetryHelpers.ServiceVersion));
 
         string? appInsightsConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+        bool exportToAzureMonitor = !string.IsNullOrWhiteSpace(appInsightsConnectionString);
         ResourceBuilder telemetryResource = ResourceBuilder.CreateDefault()
             .AddService(TelemetryHelpers.SourceName, TelemetryHelpers.ServiceVersion);
 
         builder.Logging.AddOpenTelemetry(options =>
         {
             options.SetResourceBuilder(telemetryResource);
-            options.AddAzureMonitorLogExporter(exporter =>
+            if (exportToAzureMonitor)
             {
-                exporter.ConnectionString = appInsightsConnectionString;
-                exporter.EnableTraceBasedLogsSampler = false;
-            });
+                options.AddAzureMonitorLogExporter(exporter =>
+                {
+                    exporter.ConnectionString = appInsightsConnectionString;
+                    exporter.EnableTraceBasedLogsSampler = false;
+                });
+            }
         });
 
         builder.Services.AddOpenTelemetry()
@@ -50,15 +54,21 @@ public static class TelemetryRegistration
                     .AddSource("OpenAI*")
                     .SetResourceBuilder(telemetryResource)
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddAzureMonitorTraceExporter(options => options.ConnectionString = appInsightsConnectionString);
+                    .AddHttpClientInstrumentation();
+                if (exportToAzureMonitor)
+                {
+                    tracing.AddAzureMonitorTraceExporter(options => options.ConnectionString = appInsightsConnectionString);
+                }
             })
             .WithMetrics(metrics =>
             {
                 metrics.AddMeter(TelemetryHelpers.SourceName)
                     .SetResourceBuilder(telemetryResource)
-                    .AddHttpClientInstrumentation()
-                    .AddAzureMonitorMetricExporter(options => options.ConnectionString = appInsightsConnectionString);
+                    .AddHttpClientInstrumentation();
+                if (exportToAzureMonitor)
+                {
+                    metrics.AddAzureMonitorMetricExporter(options => options.ConnectionString = appInsightsConnectionString);
+                }
             });
     }
 }

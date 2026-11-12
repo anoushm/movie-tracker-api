@@ -93,13 +93,22 @@ To rotate secrets:
 
 ## Local Development
 
-Use .NET User Secrets (secrets never in source):
+The local flow is `az login` plus `dotnet run` under the Development ASP.NET Core environment. No `set` commands for secrets, no .NET user-secrets, no secret material on disk. The eval harness (`MovieTracker.Evals`) always runs in Development (its `HarnessHost` selects it). For the API itself, Development must be active so `appsettings.Development.json` is loaded — either through a `MovieTracker.Api/Properties/launchSettings.json` with `ASPNETCORE_ENVIRONMENT=Development` (gitignored, per developer) or by exporting `$env:ASPNETCORE_ENVIRONMENT = "Development"` in the shell before `dotnet run --project MovieTracker.Api`.
 
-```bash
-cd MovieTracker.Api
-dotnet user-secrets set "AzureOpenAI:ApiKey" "<your-key>"
-dotnet user-secrets set "TheMovieDb:Api-Key" "<your-key>"
-```
+The API and the eval harness both pick up:
+
+- Secrets (`AzureOpenAI:ApiKey`, `TheMovieDb:Api-Key`, `OpenMovieDb:Api-Key`) from `movie-tracker-kv` via the Azure Key Vault configuration provider, authenticated as you through `AzureCliCredential`.
+- Non-secret endpoint values (`Azure:TenantId`, `KeyVault:Uri`, `Cosmos:Endpoint`) from a local, gitignored `MovieTracker.Api/appsettings.Development.json`:
+
+  ```json
+  {
+    "Azure":    { "TenantId": "cf732866-97a2-4a44-8301-be829baafe11" },
+    "KeyVault": { "Uri":      "https://movie-tracker-kv.vault.azure.net/" },
+    "Cosmos":   { "Endpoint": "https://movie-tracker-cosmos.documents.azure.com:443/" }
+  }
+  ```
+
+The "am I in Azure?" switch is the `CONTAINER_APP_NAME` environment variable (the Container Apps platform sets it). Locally, that variable is unset, so `AZURE_CLIENT_ID` and `AZURE_TOKEN_CREDENTIALS` are irrelevant — stale values from earlier experiments do not affect the local credential chain.
 
 ## Cosmos DB Local Development
 
@@ -123,28 +132,13 @@ The API reads three non-secret keys:
 | `Cosmos:Database` | `database` | `appsettings.json` (also `Cosmos__Database` on the Container App) |
 | `Cosmos:Container` | `chat-sessions` | `appsettings.json` (also `Cosmos__Container` on the Container App) |
 
-Only `Cosmos:Endpoint` needs to be supplied locally — set it via user-secrets or an environment variable:
+Only `Cosmos:Endpoint` needs to be supplied locally, and the local, gitignored `appsettings.Development.json` (see Local Development above) already contains it along with `Azure:TenantId` and `KeyVault:Uri`.
 
-```powershell
-cd MovieTracker.Api
-dotnet user-secrets set "Cosmos:Endpoint" "https://movie-tracker-cosmos.documents.azure.com:443/"
-```
+Startup fails fast if any of the three Cosmos keys is missing.
 
-Or in the current shell:
+### `AZURE_CLIENT_ID` and `AZURE_TOKEN_CREDENTIALS` locally
 
-```powershell
-$env:Cosmos__Endpoint = "https://movie-tracker-cosmos.documents.azure.com:443/"
-```
-
-Startup fails fast if any of the three keys is missing.
-
-### `AZURE_CLIENT_ID` must be UNSET locally
-
-The Container App sets `AZURE_CLIENT_ID` so `DefaultAzureCredential` picks the user-assigned managed identity. Locally that same variable makes the credential chain try to authenticate as the UAMI from your laptop and fail. Make sure it is unset in whatever shell you run `dotnet run` from so the chain falls through to `AzureCliCredential`:
-
-```powershell
-Remove-Item Env:AZURE_CLIENT_ID -ErrorAction SilentlyContinue
-```
+These variables are only meaningful inside the Container App. Locally the app checks `CONTAINER_APP_NAME`, which is unset, so neither `AZURE_CLIENT_ID` nor `AZURE_TOKEN_CREDENTIALS` affect the credential chain — the API uses `AzureCliCredential` with the configured `Azure:TenantId`. You do not need to clear them.
 
 ### One-time data-plane role grant (per developer)
 

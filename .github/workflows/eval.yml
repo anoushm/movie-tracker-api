@@ -1,0 +1,57 @@
+name: Eval
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  Azure__TenantId: cf732866-97a2-4a44-8301-be829baafe11
+  KeyVault__Uri: https://movie-tracker-kv.vault.azure.net/
+  Cosmos__Endpoint: https://movie-tracker-cosmos.documents.azure.com:443/
+
+jobs:
+  run:
+    name: Run Eval Harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Evals
+        id: run_evals
+        run: |
+          set -o pipefail
+          dotnet run --project MovieTracker.Evals --configuration Release | tee eval-output.txt
+
+      - name: Write Job Summary
+        if: always() && hashFiles('eval-output.txt') != ''
+        run: |
+          {
+            echo "## Eval"
+            echo ""
+            echo '```text'
+            cat eval-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Last Run
+        if: steps.run_evals.outcome == 'success' && hashFiles('MovieTracker.Evals/results/last-run.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-last-run
+          path: MovieTracker.Evals/results/last-run.json
