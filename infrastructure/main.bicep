@@ -53,6 +53,9 @@ param cosmosAccountName string
 @description('Object id of the GitHub OIDC service principal used by eval and infra workflows')
 param githubOidcPrincipalId string
 
+@description('Monthly cost budget amount for RG-MovieTracker-Demo, denominated in the subscription currency')
+param budgetAmount int
+
 var commonTags = {
   domain: 'movie-tracker'
   env: environmentType
@@ -251,6 +254,13 @@ module rbac 'rbac.bicep' = if (!empty(userPrincipalId)) {
   params: {
     keyVaultId: keyVault.outputs.keyVaultId
     userPrincipalId: userPrincipalId
+  }
+}
+
+module budget 'budget.bicep' = {
+  name: 'budget-deployment'
+  params: {
+    budgetAmount: budgetAmount
   }
 }
 

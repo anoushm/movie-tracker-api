@@ -117,6 +117,11 @@ az deployment group create \
 | `azureOpenAIEndpoint` | Azure OpenAI endpoint URL | `` (optional) |
 | `azureOpenAIDeployment` | Azure OpenAI deployment name | `` (optional) |
 | `azureOpenAIKey` | Azure OpenAI API key | `` (secure, optional) |
+| `budgetAmount` | Monthly cost budget amount (subscription currency) | `50` in `demo.parameters.json` |
+
+### Cost Budget
+
+An alert-only `Microsoft.Consumption/budgets` resource named `movie-tracker-budget` is deployed at the resource-group scope. It fires two email notifications to anyone holding the `Owner` role on the resource group — no email address is stored in the repository. Notification 1: 80% threshold on Actual cost. Notification 2: 100% threshold on Forecasted cost. The budget does NOT stop or scale any resource; it only alerts.
 
 ### Security & Managed Identity
 

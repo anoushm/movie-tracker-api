@@ -52,6 +52,9 @@
     },
     "githubOidcPrincipalId": {
       "value": "0b722528-c320-450c-a306-c0f49c81f06f"
+    },
+    "budgetAmount": {
+      "value": 50
     }
   }
 }
