@@ -85,7 +85,7 @@ public sealed class GeneratedCaseBuilder
                 }
                 case TemplateCheck.FunnyFactNotEmpty:
                 {
-                    GeneratedCase produced = this.BuildFunnyFactNotEmpty(template, selected, generatedId);
+                    GeneratedCase produced = await this.BuildFunnyFactNotEmptyAsync(template, selected, generatedId);
                     cases.Add(produced);
                     break;
                 }
@@ -116,16 +116,20 @@ public sealed class GeneratedCaseBuilder
     private async Task<GeneratedCase> BuildFollowUpDirectorAsync(CaseTemplate template, RunTitle selected, string generatedId)
     {
         MovieCredits credits = await this.GetCreditsCachedAsync(selected.TmdbId);
+        MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
+        int? year = ReleaseYearExtractor.Extract(details.ReleaseDate);
+        string yearText = year?.ToString() ?? string.Empty;
+
         IReadOnlyList<string> rawTurns = template.Turns ?? Array.Empty<string>();
         List<string> resolvedTurns = new List<string>(rawTurns.Count);
         foreach (string turn in rawTurns)
         {
-            resolvedTurns.Add(turn.Replace("{title}", selected.Title));
+            resolvedTurns.Add(turn.Replace("{title}", selected.Title).Replace("{year}", yearText));
         }
 
         string firstTurn = resolvedTurns.Count > 0 ? resolvedTurns[0] : string.Empty;
 
-        if (string.IsNullOrWhiteSpace(credits.DirectorName))
+        if (string.IsNullOrWhiteSpace(credits.DirectorName) || year is null)
         {
             return this.NoTruth(generatedId, firstTurn, resolvedTurns, template.Check);
         }
@@ -161,11 +165,15 @@ public sealed class GeneratedCaseBuilder
     private async Task<GeneratedCase> BuildIdentifyByPlotAsync(CaseTemplate template, RunTitle selected, string generatedId)
     {
         MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
+        int? year = ReleaseYearExtractor.Extract(details.ReleaseDate);
+        string yearText = year?.ToString() ?? string.Empty;
         string? overview = details.Overview;
         string strippedOverview = this.StripTitleWords(overview ?? string.Empty, selected.Title);
-        string question = this.RequireTemplate(template).Replace("{overview}", strippedOverview);
+        string question = this.RequireTemplate(template)
+            .Replace("{year}", yearText)
+            .Replace("{overview}", strippedOverview);
 
-        if (string.IsNullOrWhiteSpace(overview))
+        if (string.IsNullOrWhiteSpace(overview) || year is null)
         {
             return this.NoTruth(generatedId, question, Turns: null, template.Check);
         }
@@ -204,9 +212,13 @@ public sealed class GeneratedCaseBuilder
     private async Task<GeneratedCase> BuildRatingAsync(CaseTemplate template, RunTitle selected, string generatedId)
     {
         MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
-        string question = this.RequireTemplate(template).Replace("{title}", selected.Title);
+        int? year = ReleaseYearExtractor.Extract(details.ReleaseDate);
+        string yearText = year?.ToString() ?? string.Empty;
+        string question = this.RequireTemplate(template)
+            .Replace("{title}", selected.Title)
+            .Replace("{year}", yearText);
 
-        if (string.IsNullOrWhiteSpace(details.ImdbId))
+        if (string.IsNullOrWhiteSpace(details.ImdbId) || year is null)
         {
             return this.NoTruth(generatedId, question, Turns: null, template.Check);
         }
@@ -229,14 +241,36 @@ public sealed class GeneratedCaseBuilder
             return null;
         }
 
-        string question = this.RequireTemplate(template).Replace("{title}", selected.Title);
+        MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
+        int? year = ReleaseYearExtractor.Extract(details.ReleaseDate);
+        string yearText = year?.ToString() ?? string.Empty;
+        string question = this.RequireTemplate(template)
+            .Replace("{title}", selected.Title)
+            .Replace("{year}", yearText);
+
+        if (year is null)
+        {
+            return this.NoTruth(generatedId, question, Turns: null, template.Check);
+        }
+
         string expectedJson = JsonSerializer.Serialize(new TrailerExpected(keys));
         return new GeneratedCase(generatedId, question, Turns: null, template.Check, expectedJson, NoTruthValue: false);
     }
 
-    private GeneratedCase BuildFunnyFactNotEmpty(CaseTemplate template, RunTitle selected, string generatedId)
+    private async Task<GeneratedCase> BuildFunnyFactNotEmptyAsync(CaseTemplate template, RunTitle selected, string generatedId)
     {
-        string question = this.RequireTemplate(template).Replace("{title}", selected.Title);
+        MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
+        int? year = ReleaseYearExtractor.Extract(details.ReleaseDate);
+        string yearText = year?.ToString() ?? string.Empty;
+        string question = this.RequireTemplate(template)
+            .Replace("{title}", selected.Title)
+            .Replace("{year}", yearText);
+
+        if (year is null)
+        {
+            return this.NoTruth(generatedId, question, Turns: null, template.Check);
+        }
+
         return new GeneratedCase(generatedId, question, Turns: null, template.Check, ExpectedJson: null, NoTruthValue: false);
     }
 

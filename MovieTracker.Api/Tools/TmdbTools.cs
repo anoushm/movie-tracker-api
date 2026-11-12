@@ -478,7 +478,7 @@ public class TmdbTools
     }
 
     [Description("Get full details for one movie by its TMDb MovieId: overview, release date, genres " +
-                 "(with ids), runtime, tagline, language, top-billed cast, poster art, worldwide box " +
+                 "(with ids), runtime, tagline, language, top-billed cast, director(s), poster art, worldwide box " +
                  "office and budget, and the ImdbId. This is the single movie-detail tool - use it " +
                  "whenever you need more about a film than a search result carries, including 'how " +
                  "much did it make' and 'who was in it'. For the rating, call GetMovieRating with the " +
@@ -511,7 +511,11 @@ public class TmdbTools
             BackdropPath = movie.BackdropPath,
             WorldwideRevenueUsd = movie.Revenue,
             BudgetUsd = movie.Budget,
-            Cast = movie.Credits?.Cast?.Take(5).Select(c => c.Name).ToList()
+            Cast = movie.Credits?.Cast?.Take(5).Select(c => c.Name).ToList(),
+            Directors = movie.Credits?.Crew?
+                .Where(c => string.Equals(c.Job, "Director", StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.Name)
+                .ToList()
         };
 
         return JsonSerializer.Serialize(movieData);

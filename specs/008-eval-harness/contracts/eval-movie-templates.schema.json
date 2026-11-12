@@ -30,7 +30,7 @@
         "template": {
           "type": "string",
           "minLength": 1,
-          "description": "Single-turn question with the applicable placeholders ('{title}', '{actor}', '{overview}', '{genre}', '{decade}'). Mutually exclusive with 'turns'."
+          "description": "Single-turn question with the applicable placeholders ('{title}', '{year}', '{actor}', '{overview}', '{genre}', '{decade}'). Mutually exclusive with 'turns'."
         },
         "turns": {
           "type": "array",
