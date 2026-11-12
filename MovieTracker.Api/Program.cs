@@ -1,4 +1,5 @@
 using System;
+using Azure.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -6,12 +7,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using MovieTracker.Api;
 using MovieTracker.Api.Agents;
+using MovieTracker.Api.Azure;
 using MovieTracker.Api.Chat;
 using MovieTracker.Api.ChatSessions;
 using MovieTracker.Api.Telemetry;
 using MovieTracker.Api.Tools;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+AzureCredentialFactory credentialFactory = new AzureCredentialFactory(builder.Configuration);
+TokenCredential credential = credentialFactory.Create();
+builder.AddKeyVaultWhenLocal(credentialFactory, credential);
 
 IConfiguration configuration = builder.Configuration;
 
@@ -28,7 +34,7 @@ builder.AddTelemetry();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddMovieTools(tmdbApiKey);
 builder.Services.AddMovieAgent(openAiEndpoint, openAiApiKey, openAiDeploymentName, enableSensitiveTelemetry);
-builder.Services.AddChatSessions(cosmosEndpoint, cosmosDatabase, cosmosContainer);
+builder.Services.AddChatSessions(cosmosEndpoint, cosmosDatabase, cosmosContainer, credential);
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();

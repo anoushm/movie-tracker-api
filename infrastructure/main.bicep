@@ -50,6 +50,9 @@ param maxReplicas int = 5
 @description('Cosmos DB account name (globally unique)')
 param cosmosAccountName string
 
+@description('Object id of the GitHub OIDC service principal used by eval and infra workflows')
+param githubOidcPrincipalId string
+
 var commonTags = {
   domain: 'movie-tracker'
   env: environmentType
@@ -60,6 +63,7 @@ var commonTags = {
 var usePrivateRegistry = contains(containerImage, '.azurecr.io')
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000002'
 
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${containerAppName}-identity'
@@ -182,6 +186,33 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
+  }
+}
+
+resource existingCosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' existing = {
+  name: cosmosAccountName
+  dependsOn: [
+    cosmos
+  ]
+}
+
+resource githubOidcKeyVaultSecretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: existingKeyVault
+  name: guid(keyVaultName, githubOidcPrincipalId, keyVaultSecretsUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: githubOidcPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource githubOidcCosmosDataContributorAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = {
+  parent: existingCosmosAccount
+  name: guid(cosmosAccountName, githubOidcPrincipalId, cosmosDataContributorRoleId)
+  properties: {
+    roleDefinitionId: '${existingCosmosAccount.id}/sqlRoleDefinitions/${cosmosDataContributorRoleId}'
+    principalId: githubOidcPrincipalId
+    scope: existingCosmosAccount.id
   }
 }
 
