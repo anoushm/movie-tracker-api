@@ -71,32 +71,13 @@ public sealed class GenreDecadeCheck : IEvalCheck
                 return new EvalCheckResult(false, $"movie '{entry.Title}' is not in genre '{expected.GenreName}'", this.Name);
             }
 
-            if (!this.TryExtractYear(entry.ReleaseDate, out int year) || year < decadeStart || year > decadeEnd)
+            int? year = ReleaseYearExtractor.Extract(entry.ReleaseDate);
+            if (year is null || year.Value < decadeStart || year.Value > decadeEnd)
             {
                 return new EvalCheckResult(false, $"movie '{entry.Title}' releaseDate '{entry.ReleaseDate}' outside {decadeStart}..{decadeEnd}", this.Name);
             }
         }
 
         return new EvalCheckResult(true, "ok", this.Name);
-    }
-
-    private bool TryExtractYear(string? releaseDate, out int year)
-    {
-        year = 0;
-        if (string.IsNullOrEmpty(releaseDate) || releaseDate.Length < 4)
-        {
-            return false;
-        }
-
-        string prefix = releaseDate.Substring(0, 4);
-        foreach (char c in prefix)
-        {
-            if (!char.IsDigit(c))
-            {
-                return false;
-            }
-        }
-
-        return int.TryParse(prefix, out year);
     }
 }

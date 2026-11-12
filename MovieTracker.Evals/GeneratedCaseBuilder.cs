@@ -178,12 +178,12 @@ public sealed class GeneratedCaseBuilder
     {
         MovieDetails details = await this.GetDetailsCachedAsync(selected.TmdbId);
         string genreName = details.Genres.Count > 0 ? details.Genres[0].Name : string.Empty;
-        string? year = this.ExtractYear(details.ReleaseDate);
+        int? yearValue = ReleaseYearExtractor.Extract(details.ReleaseDate);
         string decadeText = string.Empty;
         int decadeStart = 0;
-        if (!string.IsNullOrEmpty(year) && int.TryParse(year, out int yearValue))
+        if (yearValue is not null)
         {
-            decadeStart = yearValue - (yearValue % 10);
+            decadeStart = yearValue.Value - (yearValue.Value % 10);
             decadeText = decadeStart.ToString();
         }
 
@@ -279,25 +279,6 @@ public sealed class GeneratedCaseBuilder
         }
 
         return result;
-    }
-
-    private string? ExtractYear(string? releaseDate)
-    {
-        if (string.IsNullOrWhiteSpace(releaseDate) || releaseDate.Length < 4)
-        {
-            return null;
-        }
-
-        string prefix = releaseDate.Substring(0, 4);
-        foreach (char c in prefix)
-        {
-            if (!char.IsDigit(c))
-            {
-                return null;
-            }
-        }
-
-        return prefix;
     }
 
     private async Task<MovieDetails> GetDetailsCachedAsync(int tmdbId)

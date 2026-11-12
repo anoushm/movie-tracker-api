@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Agents.AI;
 
 namespace MovieTracker.Evals;
@@ -14,17 +13,13 @@ public sealed class FunnyFactNotEmptyCheck : IEvalCheck
             return new EvalCheckResult(false, "funnyFact missing (no context)", this.Name);
         }
 
-        ActualResponsePayload? actual;
-        try
+        ActualResponsePayload? actual = ActualResponseParser.Parse(item.Context);
+        if (actual is null)
         {
-            actual = JsonSerializer.Deserialize<ActualResponsePayload>(item.Context);
-        }
-        catch (JsonException ex)
-        {
-            return new EvalCheckResult(false, $"could not parse Context: {ex.Message}", this.Name);
+            return new EvalCheckResult(false, "could not parse Context", this.Name);
         }
 
-        if (actual is null || string.IsNullOrWhiteSpace(actual.FunnyFact))
+        if (string.IsNullOrWhiteSpace(actual.FunnyFact))
         {
             return new EvalCheckResult(false, "funnyFact null or empty", this.Name);
         }
