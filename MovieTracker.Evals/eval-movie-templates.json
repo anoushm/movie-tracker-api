@@ -1,0 +1,47 @@
+{
+  "templates": [
+    {
+      "id": "director",
+      "template": "Who directed {title}?",
+      "check": "director"
+    },
+    {
+      "id": "actorFilmography",
+      "template": "Show me movies starring {actor}",
+      "check": "actorFilmography"
+    },
+    {
+      "id": "identifyByPlot",
+      "template": "Which movie is this: {overview}",
+      "check": "identifyByPlot"
+    },
+    {
+      "id": "genreDecade",
+      "template": "Show me {genre} movies from the {decade}s",
+      "check": "genreDecade"
+    },
+    {
+      "id": "rating",
+      "template": "What is the IMDb rating of {title}?",
+      "check": "rating"
+    },
+    {
+      "id": "trailer",
+      "template": "Show me the trailer for {title}.",
+      "check": "trailer"
+    },
+    {
+      "id": "followUpDirector",
+      "turns": [
+        "Tell me about {title}",
+        "Who directed it?"
+      ],
+      "check": "followUpDirector"
+    },
+    {
+      "id": "funnyFactNotEmpty",
+      "template": "Tell me a fun fact about {title}.",
+      "check": "funnyFactNotEmpty"
+    }
+  ]
+}

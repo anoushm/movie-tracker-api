@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://movie-tracker-api/specs/008-eval-harness/eval-movie-templates.schema.json",
+  "title": "CaseTemplateFile",
+  "description": "Documentation-only. Shape of MovieTracker.Evals/eval-movie-templates.json. Owner-review invariant: exactly eight templates, one per TemplateCheck value, with the exact question strings spec FR-005 names. Exactly one of 'template' or 'turns' is present per entry. The harness does NOT validate the file against this schema at run time; the loader enforces only unique ids.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["templates"],
+  "properties": {
+    "templates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/caseTemplate" }
+    }
+  },
+  "$defs": {
+    "caseTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "check"],
+      "oneOf": [
+        { "required": ["template"] },
+        { "required": ["turns"] }
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable id, unique within the file. Used as the prefix of every generated case id ('<id>-<slot>')."
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Single-turn question with the applicable placeholders ('{title}', '{actor}', '{overview}', '{genre}', '{decade}'). Mutually exclusive with 'turns'."
+        },
+        "turns": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Ordered turn texts for multi-turn templates (currently only 'followUpDirector'). Mutually exclusive with 'template'."
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "director",
+            "actorFilmography",
+            "identifyByPlot",
+            "genreDecade",
+            "rating",
+            "trailer",
+            "followUpDirector",
+            "funnyFactNotEmpty"
+          ],
+          "description": "The check kind that grades this template's case. Each check kind has its own IEvalCheck implementation (spec FR-022)."
+        }
+      }
+    }
+  }
+}

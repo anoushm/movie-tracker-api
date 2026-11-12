@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "id": "plot-ship-sinks",
+      "question": "Show me movies where a ship sinks at the end",
+      "check": "listIncludes",
+      "expected": ["Titanic"]
+    },
+    {
+      "id": "plot-mob-family",
+      "question": "Show me mobster movies about a family",
+      "check": "listIncludes",
+      "expected": ["The Godfather"]
+    }
+  ]
+}
