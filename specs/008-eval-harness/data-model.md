@@ -93,12 +93,12 @@ Entities, fields, validation rules, and state transitions for every data shape t
 
 - `director`: TMDb `/movie/{id}/credits` → first `crew[*]` with `job == "Director"` → `name`. Missing → `noTruthValue = true`.
 - `actorFilmography`: TMDb `/movie/{id}/credits` → cast order 0 → actor's `id` + `name`, then TMDb `/person/{id}/movie_credits` → `cast[*].{id, title}`. Missing cast order 0 or empty credits → `noTruthValue = true`.
-- `identifyByPlot`: TMDb `/movie/{id}?append_to_response=external_ids` → `overview` (with the movie's title words removed, case-insensitive word-level strip) + `id` + `title`. Missing/empty overview → `noTruthValue = true`.
+- `identifyByPlot`: TMDb `/movie/{id}?append_to_response=external_ids` → `overview` (with the movie's title words removed, case-insensitive word-level strip) + `id` + `title`, plus the four-digit `{year}` from `release_date` for the question text. Missing/empty overview OR missing `release_date` → `noTruthValue = true`.
 - `genreDecade`: TMDb `/movie/{id}?append_to_response=external_ids` → pick the first entry in `genres[]` (`{id, name}`) and the first-four of `release_date` → decade start `yyyy - (yyyy % 10)`. Missing genres or missing release_date → `noTruthValue = true`.
-- `rating`: TMDb `/movie/{id}?append_to_response=external_ids` → `external_ids.imdb_id`, then OMDb `/?i=<imdbId>` → `imdbRating`. Missing IMDb id, missing rating, or `imdbRating == "N/A"` → `noTruthValue = true`.
-- `trailer`: TMDb `/movie/{id}/videos` → `results[*]` filtered to `site == "YouTube"` AND `type == "Trailer"` → `key` set. **Empty set → no case produced** (qualification rule, not FR-016).
-- `followUpDirector`: resolves truth the same way `director` does (first `crew[*]` with `job == "Director"`), applied to its own independently-selected run title (research.md Decision 13 — every title-based template picks a slot at random, so `followUpDirector`'s slot is not tied to `director`'s slot).
-- `funnyFactNotEmpty`: no truth lookup.
+- `rating`: TMDb `/movie/{id}?append_to_response=external_ids` → `external_ids.imdb_id` plus the four-digit `{year}` from `release_date` for the question text, then OMDb `/?i=<imdbId>` → `imdbRating`. Missing IMDb id, missing `release_date`, missing rating, or `imdbRating == "N/A"` → `noTruthValue = true`.
+- `trailer`: TMDb `/movie/{id}/videos` → `results[*]` filtered to `site == "YouTube"` AND `type == "Trailer"` → `key` set. **Empty set → no case produced** (qualification rule, not FR-016). When the set is non-empty, the harness also reads `release_date` for the question's `{year}`; missing `release_date` → `noTruthValue = true`.
+- `followUpDirector`: resolves truth the same way `director` does (first `crew[*]` with `job == "Director"`), applied to its own independently-selected run title (research.md Decision 13 — every title-based template picks a slot at random, so `followUpDirector`'s slot is not tied to `director`'s slot). The turn 1 text also uses the four-digit `{year}` from `release_date`; missing `release_date` → `noTruthValue = true`.
+- `funnyFactNotEmpty`: no answer-grading truth lookup, but the question text uses the four-digit `{year}` from `release_date`; missing `release_date` → `noTruthValue = true`.
 
 **Validation**:
 

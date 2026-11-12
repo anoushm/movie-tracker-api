@@ -8,7 +8,7 @@
     },
     {
       "id": "plot-mob-family",
-      "question": "Show me mobster movies about a family",
+      "question": "Show me classic mobster movies about a crime family",
       "check": "listIncludes",
       "expected": ["The Godfather"]
     }

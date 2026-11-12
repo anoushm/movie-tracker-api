@@ -12,7 +12,7 @@
     },
     {
       "id": "identifyByPlot",
-      "template": "Which movie is this: {overview}",
+      "template": "Which {year} movie is this: {overview}",
       "check": "identifyByPlot"
     },
     {
@@ -22,25 +22,25 @@
     },
     {
       "id": "rating",
-      "template": "What is the IMDb rating of {title}?",
+      "template": "What is the IMDb rating of {title} ({year})?",
       "check": "rating"
     },
     {
       "id": "trailer",
-      "template": "Show me the trailer for {title}.",
+      "template": "Show me the trailer for {title} ({year}).",
       "check": "trailer"
     },
     {
       "id": "followUpDirector",
       "turns": [
-        "Tell me about {title}",
+        "Tell me about {title} ({year})",
         "Who directed it?"
       ],
       "check": "followUpDirector"
     },
     {
       "id": "funnyFactNotEmpty",
-      "template": "Tell me a fun fact about {title}.",
+      "template": "Tell me a fun fact about {title} ({year}).",
       "check": "funnyFactNotEmpty"
     }
   ]
