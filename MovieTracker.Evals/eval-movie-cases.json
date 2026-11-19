@@ -3,13 +3,11 @@
     {
       "id": "plot-ship-sinks",
       "question": "Show me movies where a ship sinks at the end",
-      "check": "listIncludes",
       "expected": ["Titanic"]
     },
     {
       "id": "plot-mob-family",
       "question": "Show me classic mobster movies about a crime family",
-      "check": "listIncludes",
       "expected": ["The Godfather"]
     }
   ]
