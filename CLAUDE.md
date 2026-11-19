@@ -42,7 +42,7 @@ MovieTracker.Api/           # Main API project
   Program.cs                # Composition root (minimal hosting)
   HealthEndpoints.cs        # MapHealthEndpoints extension
   Agents/                   # MovieAgent (AIAgent registration)
-  Tools/                    # TmdbTools, OmdbTools, TrailerTools, WikipediaTools, DateTimeTools, ChatPlanner, MovieTools (DI registration)
+  Tools/                    # TmdbTools, OmdbTools, TrailerTools, WikipediaTools, DateTimeTools, ChatPlanner, MovieToolsRegistration (DI registration)
   Chat/                     # ChatTurnEndpoints (AskAsync, AskV2Async, MapChatEndpoints)
   Models/                   # Every DTO, record, and view model
   ChatSessions/             # ChatSessionRepository, MovieTrackerChatSession, ChatStartSystemPrompt, CosmosSystemTextJsonSerializer, ChatSessionRegistration
