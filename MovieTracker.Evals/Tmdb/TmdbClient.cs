@@ -51,6 +51,32 @@ public sealed class TmdbClient : IDisposable
         return list;
     }
 
+    public async Task<IReadOnlyList<MovieSummary>> GetTopRatedAsync()
+    {
+        string path = $"movie/top_rated?api_key={this.apiKey}&page=1";
+        using JsonDocument document = await this.GetJsonOrThrowAsync(path);
+
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("results", out JsonElement results)
+            || results.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidOperationException("TMDb /movie/top_rated?page=1 response missing results array");
+        }
+
+        List<MovieSummary> list = new List<MovieSummary>();
+        foreach (JsonElement entry in results.EnumerateArray())
+        {
+            MovieSummary? summary = this.TryParseSummary(entry);
+            if (summary is not null)
+            {
+                list.Add(summary);
+            }
+        }
+
+        return list;
+    }
+
     public async Task<MovieDetails> GetMovieDetailsAsync(int tmdbId)
     {
         string path = $"movie/{tmdbId}?api_key={this.apiKey}&append_to_response=external_ids";
