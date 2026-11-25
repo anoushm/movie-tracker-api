@@ -35,6 +35,7 @@ builder.Services.AddDistributedMemoryCache();
 builder.Services.AddMovieTools(tmdbApiKey);
 builder.Services.AddMovieAgent(openAiEndpoint, openAiApiKey, openAiDeploymentName, enableSensitiveTelemetry);
 builder.Services.AddChatSessions(cosmosEndpoint, cosmosDatabase, cosmosContainer, credential);
+builder.Services.AddChatPipeline();
 builder.Services.AddOpenApi();
 
 WebApplication app = builder.Build();

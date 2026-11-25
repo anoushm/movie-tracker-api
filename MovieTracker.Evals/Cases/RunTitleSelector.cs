@@ -22,6 +22,22 @@ public sealed class RunTitleSelector
             throw new InvalidOperationException("TMDb /movie/popular?page=1 returned fewer than 2 entries; need at least 2");
         }
 
+        return this.PickTwoDistinct(results);
+    }
+
+    public async Task<IReadOnlyList<RunTitle>> SelectRatingTitlesAsync()
+    {
+        IReadOnlyList<MovieSummary> results = await this.tmdbClient.GetTopRatedAsync();
+        if (results.Count < 2)
+        {
+            throw new InvalidOperationException("TMDb /movie/top_rated?page=1 returned fewer than 2 entries; need at least 2");
+        }
+
+        return this.PickTwoDistinct(results);
+    }
+
+    private IReadOnlyList<RunTitle> PickTwoDistinct(IReadOnlyList<MovieSummary> results)
+    {
         List<int> availableIndices = new List<int>(results.Count);
         for (int index = 0; index < results.Count; index++)
         {

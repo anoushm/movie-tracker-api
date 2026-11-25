@@ -12,6 +12,7 @@ public sealed class GeneratedCaseBuilder
 {
     private readonly TmdbClient tmdbClient;
     private readonly OmdbClient omdbClient;
+    private readonly RunTitleSelector ratingTitleSelector;
 
     private readonly Dictionary<int, MovieDetails> detailsCache = new Dictionary<int, MovieDetails>();
     private readonly Dictionary<int, MovieCredits> creditsCache = new Dictionary<int, MovieCredits>();
@@ -22,6 +23,7 @@ public sealed class GeneratedCaseBuilder
     {
         this.tmdbClient = tmdbClient;
         this.omdbClient = omdbClient;
+        this.ratingTitleSelector = new RunTitleSelector(tmdbClient);
     }
 
     public async Task<GeneratedCaseBatch> BuildAsync(
@@ -29,6 +31,7 @@ public sealed class GeneratedCaseBuilder
         IReadOnlyList<RunTitle> runTitles)
     {
         List<GeneratedCase> cases = new List<GeneratedCase>();
+        IReadOnlyList<RunTitle>? ratingTitles = null;
 
         foreach (CaseTemplate template in templates)
         {
@@ -70,7 +73,12 @@ public sealed class GeneratedCaseBuilder
                     }
                     case RatingCheck.CheckName:
                     {
-                        GeneratedCase produced = await this.BuildRatingAsync(template, selected, generatedId);
+                        if (ratingTitles is null)
+                        {
+                            ratingTitles = await this.ratingTitleSelector.SelectRatingTitlesAsync();
+                        }
+                        RunTitle ratingTitle = ratingTitles[selected.Slot - 1];
+                        GeneratedCase produced = await this.BuildRatingAsync(template, ratingTitle, generatedId);
                         cases.Add(produced);
                         break;
                     }
